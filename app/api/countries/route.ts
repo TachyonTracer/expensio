@@ -1,87 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { currencyService } from '@/lib/services/currency.service';
-import { ApiResponse } from '@/lib/types';
-import { API_ERROR_CODES } from '@/lib/constants';
+import { createApiResponse } from '@/lib/api-response';
+import { handleApiError } from '@/lib/error-handler';
 
-/**
- * GET /api/countries
- * Get countries and their currencies
- */
-export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse>> {
+interface Country {
+  name: { common: string };
+  currencies: Record<string, { name: string; symbol: string }>;
+}
+
+// GET /api/countries - Get list of countries with currencies
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const includeMapping = searchParams.get('mapping') === 'true';
-    const country = searchParams.get('country');
-
-    if (country) {
-      // Get primary currency for a specific country
-      const primaryCurrency = await currencyService.getPrimaryCurrencyForCountry(country);
-      
-      if (!primaryCurrency) {
-        return NextResponse.json({
-          success: false,
-          error: {
-            code: API_ERROR_CODES.RESOURCE_NOT_FOUND,
-            message: `Country '${country}' not found or has no currency data`,
-            details: { country }
-          },
-          timestamp: new Date().toISOString()
-        }, { status: 404 });
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          country,
-          primaryCurrency,
-          timestamp: new Date().toISOString()
-        },
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Get all countries data
-    const countriesData = await currencyService.fetchCountriesData();
+    // Fetch countries data from REST Countries API
+    const response = await fetch('https://restcountries.com/v3.1/all?fields=name,currencies');
     
-    // Transform data for easier consumption
-    const countries = countriesData.map(country => ({
-      name: country.name.common,
-      officialName: country.name.official,
-      currencies: country.currencies ? Object.entries(country.currencies).map(([code, info]) => ({
-        code,
-        name: info.name,
-        symbol: info.symbol
-      })) : []
-    })).sort((a, b) => a.name.localeCompare(b.name));
-
-    let responseData: any = {
-      countries,
-      count: countries.length
-    };
-
-    // Include country-currency mapping if requested
-    if (includeMapping) {
-      const mapping = await currencyService.getCountryCurrencyMapping();
-      responseData.mapping = mapping;
+    if (!response.ok) {
+      throw new Error('Failed to fetch countries data');
     }
 
-    return NextResponse.json({
-      success: true,
-      data: responseData,
-      timestamp: new Date().toISOString()
-    });
+    const countries: Country[] = await response.json();
+    
+    // Sort countries by name for better UX
+    const sortedCountries = countries
+      .filter(country => country.name?.common && country.currencies)
+      .sort((a, b) => a.name.common.localeCompare(b.name.common));
 
+    return NextResponse.json(createApiResponse(true, sortedCountries));
   } catch (error) {
-    console.error('Error in GET /api/countries:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: API_ERROR_CODES.EXTERNAL_SERVICE_ERROR,
-        message: error instanceof Error ? error.message : 'Failed to fetch countries data',
-        details: { endpoint: '/api/countries' }
+    // Return a fallback list of common countries if the API fails
+    const fallbackCountries = [
+      {
+        name: { common: 'United States' },
+        currencies: { USD: { name: 'United States Dollar', symbol: '$' } }
       },
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+      {
+        name: { common: 'United Kingdom' },
+        currencies: { GBP: { name: 'British Pound Sterling', symbol: '£' } }
+      },
+      {
+        name: { common: 'Canada' },
+        currencies: { CAD: { name: 'Canadian Dollar', symbol: '$' } }
+      },
+      {
+        name: { common: 'Australia' },
+        currencies: { AUD: { name: 'Australian Dollar', symbol: '$' } }
+      },
+      {
+        name: { common: 'Germany' },
+        currencies: { EUR: { name: 'Euro', symbol: '€' } }
+      },
+      {
+        name: { common: 'France' },
+        currencies: { EUR: { name: 'Euro', symbol: '€' } }
+      },
+      {
+        name: { common: 'Japan' },
+        currencies: { JPY: { name: 'Japanese Yen', symbol: '¥' } }
+      },
+      {
+        name: { common: 'India' },
+        currencies: { INR: { name: 'Indian Rupee', symbol: '₹' } }
+      },
+    ];
+
+    return NextResponse.json(createApiResponse(true, fallbackCountries));
   }
 }
