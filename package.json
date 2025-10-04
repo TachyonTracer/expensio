@@ -12,7 +12,9 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "performance:test": "node scripts/performance-test.js",
+    "performance:build-test": "npm run build && npm start & sleep 5 && npm run performance:test && pkill -f 'next start'"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -20,6 +22,7 @@
     "clsx": "^2.1.1",
     "gsap": "^3.12.5",
     "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.544.0",
     "multer": "^1.4.5-lts.1",
     "next": "15.5.4",
     "nodemailer": "^6.9.15",

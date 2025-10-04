@@ -106,3 +106,136 @@ body {
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Grid pattern for hero background */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus styles for accessibility */
+.focus-visible:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* GSAP Animation Optimizations */
+.gsap-element {
+  will-change: transform, opacity;
+}
+
+/* Prevent layout shifts during animations */
+.hero-badge,
+.hero-headline,
+.hero-subtext,
+.hero-cta,
+.hero-trust {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Smooth transitions for dark mode */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Animation performance optimizations */
+.feature-card,
+.testimonial-card,
+.parallax-element {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Ensure animations work well in reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Custom animation classes for GSAP */
+.fade-in {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.slide-up {
+  opacity: 0;
+  transform: translateY(50px);
+}
+
+.scale-in {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.rotate-in {
+  opacity: 0;
+  transform: rotate(-5deg) scale(0.9);
+}
+
+/* Parallax container */
+.parallax-container {
+  overflow: hidden;
+}
+
+/* Smooth hover transitions */
+.animated-button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Loading state for animations */
+.loading-animations {
+  pointer-events: none;
+}
+
+.loading-animations * {
+  opacity: 0;
+}
+
+/* Dark mode specific animation adjustments */
+@media (prefers-color-scheme: dark) {
+  .hero-float-1,
+  .hero-float-2,
+  .hero-float-3 {
+    filter: brightness(0.8);
+  }
+  
+  .parallax-element {
+    filter: brightness(0.7);
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .hero-float-1,
+  .hero-float-2,
+  .hero-float-3,
+  .parallax-element {
+    opacity: 0.5 !important;
+  }
+}
+
+/* Animation debugging (remove in production) */
+.debug-animations * {
+  outline: 1px solid red !important;
+}
