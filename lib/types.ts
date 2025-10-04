@@ -331,6 +331,26 @@ export const UpdateExpenseSchema = z.object({
 });
 export type UpdateExpenseDto = z.infer<typeof UpdateExpenseSchema>;
 
+export const CreateApprovalRuleSchema = z.object({
+  name: z.string().min(1, 'Rule name is required'),
+  minAmount: z.number().positive().optional(),
+  maxAmount: z.number().positive().optional(),
+  category: z.string().optional(),
+  ruleType: ApprovalRuleTypeSchema,
+  ruleConfig: ApprovalRuleConfigSchema,
+  isActive: z.boolean().optional(),
+}).refine((data) => {
+  // Ensure minAmount is less than maxAmount if both are provided
+  if (data.minAmount && data.maxAmount && data.minAmount >= data.maxAmount) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Minimum amount must be less than maximum amount',
+  path: ['minAmount'],
+});
+export type CreateApprovalRuleDto = z.infer<typeof CreateApprovalRuleSchema>;
+
 export const UpdateApprovalRuleSchema = z.object({
   name: z.string().min(1, 'Rule name is required').optional(),
   minAmount: z.number().positive().optional(),
@@ -339,6 +359,15 @@ export const UpdateApprovalRuleSchema = z.object({
   ruleType: ApprovalRuleTypeSchema.optional(),
   ruleConfig: ApprovalRuleConfigSchema.optional(),
   isActive: z.boolean().optional(),
+}).refine((data) => {
+  // Ensure minAmount is less than maxAmount if both are provided
+  if (data.minAmount && data.maxAmount && data.minAmount >= data.maxAmount) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Minimum amount must be less than maximum amount',
+  path: ['minAmount'],
 });
 export type UpdateApprovalRuleDto = z.infer<typeof UpdateApprovalRuleSchema>;
 
@@ -432,14 +461,36 @@ export interface AdminDashboardData {
 }
 
 // Error Types
-export interface ValidationError {
+export interface ValidationErrorItem {
   field: string;
   message: string;
   code: string;
 }
 
-export interface BusinessRuleError {
+export interface BusinessRuleErrorData {
   rule: string;
   message: string;
   context?: Record<string, any>;
+}
+
+export class ValidationError extends Error {
+  public errors: ValidationErrorItem[];
+  
+  constructor(data: { message: string; errors: ValidationErrorItem[] }) {
+    super(data.message);
+    this.name = 'ValidationError';
+    this.errors = data.errors;
+  }
+}
+
+export class BusinessRuleError extends Error {
+  public rule: string;
+  public context?: Record<string, any>;
+  
+  constructor(data: { rule: string; message: string; context?: Record<string, any> }) {
+    super(data.message);
+    this.name = 'BusinessRuleError';
+    this.rule = data.rule;
+    this.context = data.context;
+  }
 }

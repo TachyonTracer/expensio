@@ -77,3 +77,20 @@ export function createInternalServerErrorResponse(): NextResponse<ApiResponse> {
     500
   );
 }
+
+export function createApiResponse<T>(
+  success: boolean,
+  data?: T,
+  error?: {
+    code: string;
+    message: string;
+    details?: Record<string, any>;
+  }
+): ApiResponse<T> {
+  return {
+    success,
+    data,
+    error,
+    timestamp: new Date().toISOString(),
+  };
+}

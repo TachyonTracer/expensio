@@ -48,3 +48,14 @@ export function extractTokenFromHeader(authHeader: string | null): string | null
   }
   return authHeader.substring(7);
 }
+
+export async function verifyToken(request: Request): Promise<JWTPayload | null> {
+  const authHeader = request.headers.get('authorization');
+  const token = extractTokenFromHeader(authHeader);
+  
+  if (!token) {
+    return null;
+  }
+  
+  return verifyAccessToken(token);
+}
