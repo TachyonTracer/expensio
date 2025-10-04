@@ -26,7 +26,14 @@
     - Implement data validation schemas using Zod or similar
     - _Requirements: 7.3, 1.1, 2.1, 3.1, 4.1_
 
-  - [ ]\* 2.3 Write unit tests for data models
+  - [-] 2.3 Write unit tests for data models
+
+
+
+
+
+
+
     - Create unit tests for data validation functions
     - Test enum values and type constraints
     - Validate database schema constraints
@@ -62,7 +69,11 @@
     - Create user profile update functionality
     - _Requirements: 1.3, 1.4, 1.5, 2.1, 2.2, 2.3_
 
-  - [ ]\* 3.4 Write authentication and authorization tests
+  - [-] 3.4 Write authentication and authorization tests
+
+
+
+
     - Test JWT token generation and validation
     - Test role-based access control middleware
     - Test user management API endpoints with different roles
