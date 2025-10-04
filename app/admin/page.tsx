@@ -5,6 +5,7 @@ import { ProtectedRoute } from '@/components/auth/protected-route';
 import { UserManagement } from '@/components/admin/user-management';
 import { ApprovalRuleBuilder } from '@/components/admin/approval-rule-builder';
 import { CompanySettings } from '@/components/admin/company-settings';
+import { ThemeSelector } from '@/components/theme/theme-toggle';
 import { Button } from '@/components/ui/button';
 
 type TabType = 'users' | 'rules' | 'settings';
@@ -61,19 +62,20 @@ export default function AdminPage() {
 
   return (
     <ProtectedRoute requiredRole="ADMIN">
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="px-4 py-6 sm:px-0">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
-                <p className="mt-2 text-gray-600">
+                <h1 className="text-3xl font-bold text-foreground">Administration</h1>
+                <p className="mt-2 text-muted-foreground">
                   Manage users, approval rules, and company settings
                 </p>
               </div>
               <div className="flex items-center space-x-3">
-                <div className="bg-white rounded-lg shadow px-4 py-2">
+                <ThemeSelector />
+                <div className="bg-card rounded-lg shadow px-4 py-2 border border-border">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
                       <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
@@ -83,8 +85,8 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">Admin Access</p>
-                      <p className="text-xs text-gray-500">Full system privileges</p>
+                      <p className="text-sm font-medium text-foreground">Admin Access</p>
+                      <p className="text-xs text-muted-foreground">Full system privileges</p>
                     </div>
                   </div>
                 </div>
@@ -94,7 +96,7 @@ export default function AdminPage() {
 
           {/* Tab Navigation */}
           <div className="px-4 sm:px-0">
-            <div className="border-b border-gray-200">
+            <div className="border-b border-border">
               <nav className="-mb-px flex space-x-8" aria-label="Tabs">
                 {tabs.map((tab) => (
                   <button
@@ -109,7 +111,7 @@ export default function AdminPage() {
                     {getTabIcon(tab.icon)}
                     <div className="text-left">
                       <div>{tab.name}</div>
-                      <div className="text-xs text-gray-500 font-normal">
+                      <div className="text-xs text-muted-foreground font-normal">
                         {tab.description}
                       </div>
                     </div>

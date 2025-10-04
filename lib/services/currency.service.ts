@@ -1,5 +1,10 @@
 import { Currency, ExchangeRates, ConversionResult } from '../types';
-import { EXTERNAL_APIS, CACHE_KEYS, CACHE_TTL, API_ERROR_CODES } from '../constants';
+import {
+  EXTERNAL_APIS,
+  CACHE_KEYS,
+  CACHE_TTL,
+  API_ERROR_CODES,
+} from '../constants';
 import { prisma } from '../db';
 
 // In-memory cache for exchange rates and countries
@@ -17,27 +22,27 @@ class CurrencyCache {
     this.cache.set(key, {
       data,
       timestamp: now,
-      expiresAt: now + (ttl * 1000)
+      expiresAt: now + ttl * 1000,
     });
   }
 
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
     if (!entry) return null;
-    
+
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
       return null;
     }
-    
+
     return entry.data as T;
   }
 
   isStale(key: string, maxAge: number): boolean {
     const entry = this.cache.get(key);
     if (!entry) return true;
-    
-    return (Date.now() - entry.timestamp) > (maxAge * 1000);
+
+    return Date.now() - entry.timestamp > maxAge * 1000;
   }
 
   clear(): void {
@@ -54,10 +59,13 @@ interface CountryData {
     common: string;
     official: string;
   };
-  currencies: Record<string, {
-    name: string;
-    symbol: string;
-  }>;
+  currencies: Record<
+    string,
+    {
+      name: string;
+      symbol: string;
+    }
+  >;
 }
 
 interface ExchangeRateResponse {
@@ -80,74 +88,88 @@ export class CurrencyService {
 
       const response = await fetch(EXTERNAL_APIS.COUNTRIES, {
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Expensio-Currency-Service/1.0'
-        }
+          Accept: 'application/json',
+          'User-Agent': 'Expensio-Currency-Service/1.0',
+        },
       });
 
       if (!response.ok) {
-        throw new Error(`Countries API responded with status: ${response.status}`);
+        throw new Error(
+          `Countries API responded with status: ${response.status}`
+        );
       }
 
       const data: CountryData[] = await response.json();
-      
+
       // Cache the data
       currencyCache.set(CACHE_KEYS.COUNTRIES, data, CACHE_TTL.COUNTRIES);
-      
+
       return data;
     } catch (error) {
       console.error('Error fetching countries data:', error);
-      
+
       // Try to return stale cached data if available
       const staleData = currencyCache.get<CountryData[]>(CACHE_KEYS.COUNTRIES);
       if (staleData) {
         console.warn('Using stale countries data due to API failure');
         return staleData;
       }
-      
-      throw new Error(`${API_ERROR_CODES.EXTERNAL_SERVICE_ERROR}: Failed to fetch countries data`);
+
+      throw new Error(
+        `${API_ERROR_CODES.EXTERNAL_SERVICE_ERROR}: Failed to fetch countries data`
+      );
     }
   }
 
   /**
    * Fetch exchange rates from Exchange Rate API
    */
-  async fetchExchangeRates(baseCurrency: string = 'USD'): Promise<ExchangeRates> {
+  async fetchExchangeRates(
+    baseCurrency: string = 'USD'
+  ): Promise<ExchangeRates> {
     try {
       const cacheKey = `${CACHE_KEYS.EXCHANGE_RATES}_${baseCurrency}`;
-      
+
       // Check cache first
       const cached = currencyCache.get<ExchangeRates>(cacheKey);
-      if (cached && !currencyCache.isStale(cacheKey, CACHE_TTL.EXCHANGE_RATES / 2)) {
+      if (
+        cached &&
+        !currencyCache.isStale(cacheKey, CACHE_TTL.EXCHANGE_RATES / 2)
+      ) {
         return cached;
       }
 
-      const response = await fetch(`${EXTERNAL_APIS.EXCHANGE_RATES}/${baseCurrency}`, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Expensio-Currency-Service/1.0'
+      const response = await fetch(
+        `${EXTERNAL_APIS.EXCHANGE_RATES}/${baseCurrency}`,
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'Expensio-Currency-Service/1.0',
+          },
         }
-      });
+      );
 
       if (!response.ok) {
-        throw new Error(`Exchange Rate API responded with status: ${response.status}`);
+        throw new Error(
+          `Exchange Rate API responded with status: ${response.status}`
+        );
       }
 
       const data: ExchangeRateResponse = await response.json();
-      
+
       const exchangeRates: ExchangeRates = {
         base: data.base,
         rates: data.rates,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
+
       // Cache the data
       currencyCache.set(cacheKey, exchangeRates, CACHE_TTL.EXCHANGE_RATES);
-      
+
       return exchangeRates;
     } catch (error) {
       console.error('Error fetching exchange rates:', error);
-      
+
       // Try to return stale cached data if available
       const cacheKey = `${CACHE_KEYS.EXCHANGE_RATES}_${baseCurrency}`;
       const staleData = currencyCache.get<ExchangeRates>(cacheKey);
@@ -155,8 +177,10 @@ export class CurrencyService {
         console.warn('Using stale exchange rates due to API failure');
         return staleData;
       }
-      
-      throw new Error(`${API_ERROR_CODES.CURRENCY_API_ERROR}: Failed to fetch exchange rates for ${baseCurrency}`);
+
+      throw new Error(
+        `${API_ERROR_CODES.CURRENCY_API_ERROR}: Failed to fetch exchange rates for ${baseCurrency}`
+      );
     }
   }
 
@@ -167,7 +191,7 @@ export class CurrencyService {
     try {
       const countriesData = await this.fetchCountriesData();
       const currencyMap = new Map<string, Currency>();
-      
+
       // Extract unique currencies from countries data
       countriesData.forEach(country => {
         if (country.currencies) {
@@ -178,17 +202,21 @@ export class CurrencyService {
                 name: currencyInfo.name,
                 symbol: currencyInfo.symbol || code,
                 exchangeRate: 1, // Will be updated when fetching rates
-                lastUpdated: new Date()
+                lastUpdated: new Date(),
               });
             }
           });
         }
       });
 
-      return Array.from(currencyMap.values()).sort((a, b) => a.code.localeCompare(b.code));
+      return Array.from(currencyMap.values()).sort((a, b) =>
+        a.code.localeCompare(b.code)
+      );
     } catch (error) {
       console.error('Error getting supported currencies:', error);
-      throw new Error(`${API_ERROR_CODES.EXTERNAL_SERVICE_ERROR}: Failed to get supported currencies`);
+      throw new Error(
+        `${API_ERROR_CODES.EXTERNAL_SERVICE_ERROR}: Failed to get supported currencies`
+      );
     }
   }
 
@@ -199,7 +227,7 @@ export class CurrencyService {
     try {
       const exchangeRates = await this.fetchExchangeRates(baseCurrency);
       const supportedCurrencies = await this.getSupportedCurrencies();
-      
+
       // Prepare currency updates
       const currencyUpdates = supportedCurrencies.map(currency => {
         const rate = exchangeRates.rates[currency.code] || 1;
@@ -208,7 +236,7 @@ export class CurrencyService {
           name: currency.name,
           symbol: currency.symbol,
           exchangeRate: rate,
-          lastUpdated: new Date()
+          lastUpdated: new Date(),
         };
       });
 
@@ -219,17 +247,21 @@ export class CurrencyService {
             where: { code: currency.code },
             update: {
               exchangeRate: currency.exchangeRate,
-              lastUpdated: currency.lastUpdated
+              lastUpdated: currency.lastUpdated,
             },
-            create: currency
+            create: currency,
           })
         )
       );
 
-      console.log(`Updated exchange rates for ${currencyUpdates.length} currencies`);
+      console.log(
+        `Updated exchange rates for ${currencyUpdates.length} currencies`
+      );
     } catch (error) {
       console.error('Error updating exchange rates in database:', error);
-      throw new Error(`${API_ERROR_CODES.DATABASE_ERROR}: Failed to update exchange rates`);
+      throw new Error(
+        `${API_ERROR_CODES.DATABASE_ERROR}: Failed to update exchange rates`
+      );
     }
   }
 
@@ -239,13 +271,15 @@ export class CurrencyService {
   async getCurrency(code: string): Promise<Currency | null> {
     try {
       const currency = await prisma.currency.findUnique({
-        where: { code: code.toUpperCase() }
+        where: { code: code.toUpperCase() },
       });
 
       return currency;
     } catch (error) {
       console.error('Error getting currency from database:', error);
-      throw new Error(`${API_ERROR_CODES.DATABASE_ERROR}: Failed to get currency ${code}`);
+      throw new Error(
+        `${API_ERROR_CODES.DATABASE_ERROR}: Failed to get currency ${code}`
+      );
     }
   }
 
@@ -255,28 +289,33 @@ export class CurrencyService {
   async getAllCurrencies(): Promise<Currency[]> {
     try {
       const currencies = await prisma.currency.findMany({
-        orderBy: { code: 'asc' }
+        orderBy: { code: 'asc' },
       });
 
       return currencies;
     } catch (error) {
       console.error('Error getting currencies from database:', error);
-      throw new Error(`${API_ERROR_CODES.DATABASE_ERROR}: Failed to get currencies`);
+      throw new Error(
+        `${API_ERROR_CODES.DATABASE_ERROR}: Failed to get currencies`
+      );
     }
   }
 
   /**
    * Check if exchange rates need updating
    */
-  async shouldUpdateRates(maxAge: number = CACHE_TTL.EXCHANGE_RATES): Promise<boolean> {
+  async shouldUpdateRates(
+    maxAge: number = CACHE_TTL.EXCHANGE_RATES
+  ): Promise<boolean> {
     try {
       const latestCurrency = await prisma.currency.findFirst({
-        orderBy: { lastUpdated: 'desc' }
+        orderBy: { lastUpdated: 'desc' },
       });
 
       if (!latestCurrency) return true;
 
-      const ageInSeconds = (Date.now() - latestCurrency.lastUpdated.getTime()) / 1000;
+      const ageInSeconds =
+        (Date.now() - latestCurrency.lastUpdated.getTime()) / 1000;
       return ageInSeconds > maxAge;
     } catch (error) {
       console.error('Error checking if rates need updating:', error);
@@ -302,18 +341,22 @@ export class CurrencyService {
       return mapping;
     } catch (error) {
       console.error('Error getting country currency mapping:', error);
-      throw new Error(`${API_ERROR_CODES.EXTERNAL_SERVICE_ERROR}: Failed to get country currency mapping`);
+      throw new Error(
+        `${API_ERROR_CODES.EXTERNAL_SERVICE_ERROR}: Failed to get country currency mapping`
+      );
     }
   }
 
   /**
    * Get primary currency for a country
    */
-  async getPrimaryCurrencyForCountry(countryName: string): Promise<string | null> {
+  async getPrimaryCurrencyForCountry(
+    countryName: string
+  ): Promise<string | null> {
     try {
       const mapping = await this.getCountryCurrencyMapping();
       const currencies = mapping[countryName];
-      
+
       if (!currencies || currencies.length === 0) {
         return null;
       }
@@ -339,7 +382,7 @@ export class CurrencyService {
   getCacheStats(): { size: number; keys: string[] } {
     return {
       size: currencyCache['cache'].size,
-      keys: Array.from(currencyCache['cache'].keys())
+      keys: Array.from(currencyCache['cache'].keys()),
     };
   }
 }

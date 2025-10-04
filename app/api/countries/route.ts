@@ -43,21 +43,20 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
     // Get all countries data
     const countriesData = await currencyService.fetchCountriesData();
     
-    // Transform data for easier consumption
+    // Keep the original structure that frontend components expect
     const countries = countriesData.map(country => ({
-      name: country.name.common,
-      officialName: country.name.official,
+      name: {
+        common: country.name.common,
+        official: country.name.official
+      },
       currencies: country.currencies ? Object.entries(country.currencies).map(([code, info]) => ({
         code,
         name: info.name,
         symbol: info.symbol
       })) : []
-    })).sort((a, b) => a.name.localeCompare(b.name));
+    })).sort((a, b) => a.name.common.localeCompare(b.name.common));
 
-    let responseData: any = {
-      countries,
-      count: countries.length
-    };
+    let responseData: any = countries;
 
     // Include country-currency mapping if requested
     if (includeMapping) {

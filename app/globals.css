@@ -1,13 +1,20 @@
 @import "tailwindcss";
 
+/* Light theme (default) */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
-  --accent: #f8fafc;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
   --accent-foreground: #0f172a;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
@@ -17,13 +24,42 @@
   --radius: 0.5rem;
 }
 
+/* Dark theme */
+.dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+  --popover: #1e293b;
+  --popover-foreground: #f8fafc;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #f8fafc;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #334155;
+  --input: #334155;
+  --ring: #3b82f6;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
@@ -36,14 +72,21 @@
   --radius: var(--radius);
 }
 
+/* Auto dark mode based on system preference */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not(.light) {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --card: #1e293b;
+    --card-foreground: #f8fafc;
+    --popover: #1e293b;
+    --popover-foreground: #f8fafc;
     --primary: #3b82f6;
     --primary-foreground: #ffffff;
     --secondary: #1e293b;
     --secondary-foreground: #f8fafc;
+    --muted: #334155;
+    --muted-foreground: #94a3b8;
     --accent: #1e293b;
     --accent-foreground: #f8fafc;
     --destructive: #ef4444;
@@ -59,9 +102,30 @@
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Base input styling */
+input, textarea, select {
+  background-color: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+  transition: all 0.2s ease;
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+
+/* Focus states */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
 }
 
 /* Custom scrollbar */
@@ -81,6 +145,60 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--foreground);
+}
+
+/* Theme-aware utility classes */
+.bg-background {
+  background-color: var(--background);
+}
+
+.bg-card {
+  background-color: var(--card);
+}
+
+.bg-muted {
+  background-color: var(--muted);
+}
+
+.text-foreground {
+  color: var(--foreground);
+}
+
+.text-muted-foreground {
+  color: var(--muted-foreground);
+}
+
+.border-border {
+  border-color: var(--border);
+}
+
+/* Override Tailwind classes for theme consistency */
+.bg-white {
+  background-color: var(--card) !important;
+}
+
+.bg-gray-50 {
+  background-color: var(--muted) !important;
+}
+
+.text-gray-900 {
+  color: var(--foreground) !important;
+}
+
+.text-gray-600 {
+  color: var(--muted-foreground) !important;
+}
+
+.text-gray-500 {
+  color: var(--muted-foreground) !important;
+}
+
+.border-gray-300 {
+  border-color: var(--border) !important;
+}
+
+.border-gray-200 {
+  border-color: var(--border) !important;
 }
 
 /* Loading animations */

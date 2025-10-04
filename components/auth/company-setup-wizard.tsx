@@ -280,7 +280,7 @@ export function CompanySetupWizard() {
                 disabled={isLoading || loadingCountries}
               >
                 <option value="">Select your country</option>
-                {countries.map((country) => (
+                {countries && countries.map((country) => (
                   <option key={country.name.common} value={country.name.common}>
                     {country.name.common}
                   </option>

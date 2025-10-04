@@ -18,6 +18,7 @@ The Expensio is a Smart Expense Management System is designed to streamline empl
 4. WHEN an Admin manages users THEN the system SHALL allow assignment of roles (Employee, Manager)
 5. WHEN an Admin manages users THEN the system SHALL allow definition of reporting relationships between users
 6. As a Admin I can Manage the relation between employees and Managers from dropdown and send their password which is unique and use nodemailer to send password to their email
+
 ### Requirement 2: Authentication and Role-Based Access Control
 
 **User Story:** As a system user, I want role-based access controls that match my responsibilities, so that I can perform my job functions while maintaining security and data integrity.
@@ -101,6 +102,6 @@ The Expensio is a Smart Expense Management System is designed to streamline empl
 6. WHEN OCR processing is required THEN the system SHALL integrate Tesseract.js or equivalent OCR library and select currency
 7. WHEN external APIs are called THEN the system SHALL implement proper error handling and fallback mechanisms
 8. WHEN the system handles file uploads THEN it SHALL validate file types and implement size limits for security
-9.Skeleton loading for loading apis
-10.Breadcrum for navigation showing
-11.Resposive design for Mobile and Desktop screen, Use hamburger menu for mobile device
+   9.Skeleton loading for loading apis
+   10.Breadcrum for navigation showing
+   11.Resposive design for Mobile and Desktop screen, Use hamburger menu for mobile device
