@@ -6,4 +6,7 @@ const globalForPrisma = globalThis as unknown as {
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 
+// Export as db for backward compatibility
+export const db = prisma;
+
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

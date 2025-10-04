@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@/lib/types';
 import { createApiResponse, createErrorResponse } from '@/lib/api-response';
 import { authenticateRequest } from '@/lib/middleware';
 import { updateCompanySettings, getCompanyOverview } from '@/lib/services/company-service';
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Only admins can view company settings
-    if (authResult.user.role !== UserRole.ADMIN) {
+    if (authResult.user.role !== 'ADMIN') {
       return NextResponse.json(
         createErrorResponse('FORBIDDEN', 'Admin access required'),
         { status: 403 }
@@ -56,7 +56,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Only admins can update company settings
-    if (authResult.user.role !== UserRole.ADMIN) {
+    if (authResult.user.role !== 'ADMIN') {
       return NextResponse.json(
         createErrorResponse('FORBIDDEN', 'Admin access required'),
         { status: 403 }

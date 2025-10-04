@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { CreateCompanySchema, UpdateCompanySchema } from '@/lib/types';
 import { createApiResponse, createErrorResponse } from '@/lib/api-response';
 import { authenticateRequest } from '@/lib/middleware';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@/lib/types';
 
 // GET /api/companies - Get company details (Admin only)
 export async function GET(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Only admins can view company details
-    if (authResult.user.role !== UserRole.ADMIN) {
+    if (authResult.user.role !== 'ADMIN') {
       return NextResponse.json(
         createErrorResponse('FORBIDDEN', 'Admin access required'),
         { status: 403 }
@@ -142,7 +142,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Only admins can update company settings
-    if (authResult.user.role !== UserRole.ADMIN) {
+    if (authResult.user.role !== 'ADMIN') {
       return NextResponse.json(
         createErrorResponse('FORBIDDEN', 'Admin access required'),
         { status: 403 }

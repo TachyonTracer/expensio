@@ -7,19 +7,19 @@ export type UserRole = z.infer<typeof UserRoleSchema>;
 // Expense Types
 export const ExpenseStatusSchema = z.enum([
   'DRAFT',
-  'SUBMITTED', 
+  'SUBMITTED',
   'PENDING_APPROVAL',
   'APPROVED',
   'REJECTED',
-  'REIMBURSED'
+  'REIMBURSED',
 ]);
 export type ExpenseStatus = z.infer<typeof ExpenseStatusSchema>;
 
 // Approval Types
 export const ApprovalRuleTypeSchema = z.enum([
   'PERCENTAGE',
-  'SPECIFIC_APPROVER', 
-  'HYBRID'
+  'SPECIFIC_APPROVER',
+  'HYBRID',
 ]);
 export type ApprovalRuleType = z.infer<typeof ApprovalRuleTypeSchema>;
 
@@ -107,10 +107,12 @@ export const ReceiptSchema = z.object({
 export const ApprovalRuleConfigSchema = z.object({
   requiredPercentage: z.number().min(0).max(100).optional(),
   specificApprovers: z.array(z.string().uuid()).optional(),
-  hybridRules: z.object({
-    percentage: z.number().min(0).max(100),
-    specificApprovers: z.array(z.string().uuid()),
-  }).optional(),
+  hybridRules: z
+    .object({
+      percentage: z.number().min(0).max(100),
+      specificApprovers: z.array(z.string().uuid()),
+    })
+    .optional(),
 });
 
 export const ApprovalRuleSchema = z.object({
@@ -323,7 +325,10 @@ export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 
 export const UpdateExpenseSchema = z.object({
   originalAmount: z.number().positive('Amount must be positive').optional(),
-  originalCurrency: z.string().length(3, 'Currency code must be 3 characters').optional(),
+  originalCurrency: z
+    .string()
+    .length(3, 'Currency code must be 3 characters')
+    .optional(),
   category: z.string().min(1, 'Category is required').optional(),
   description: z.string().min(1, 'Description is required').optional(),
   expenseDate: z.date().optional(),
@@ -331,52 +336,73 @@ export const UpdateExpenseSchema = z.object({
 });
 export type UpdateExpenseDto = z.infer<typeof UpdateExpenseSchema>;
 
-export const CreateApprovalRuleSchema = z.object({
-  name: z.string().min(1, 'Rule name is required'),
-  minAmount: z.number().positive().optional(),
-  maxAmount: z.number().positive().optional(),
-  category: z.string().optional(),
-  ruleType: ApprovalRuleTypeSchema,
-  ruleConfig: ApprovalRuleConfigSchema,
-  isActive: z.boolean().optional(),
-}).refine((data) => {
-  // Ensure minAmount is less than maxAmount if both are provided
-  if (data.minAmount && data.maxAmount && data.minAmount >= data.maxAmount) {
-    return false;
-  }
-  return true;
-}, {
-  message: 'Minimum amount must be less than maximum amount',
-  path: ['minAmount'],
-});
+export const CreateApprovalRuleSchema = z
+  .object({
+    name: z.string().min(1, 'Rule name is required'),
+    minAmount: z.number().positive().optional(),
+    maxAmount: z.number().positive().optional(),
+    category: z.string().optional(),
+    ruleType: ApprovalRuleTypeSchema,
+    ruleConfig: ApprovalRuleConfigSchema,
+    isActive: z.boolean().optional(),
+  })
+  .refine(
+    data => {
+      // Ensure minAmount is less than maxAmount if both are provided
+      if (
+        data.minAmount &&
+        data.maxAmount &&
+        data.minAmount >= data.maxAmount
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Minimum amount must be less than maximum amount',
+      path: ['minAmount'],
+    }
+  );
 export type CreateApprovalRuleDto = z.infer<typeof CreateApprovalRuleSchema>;
 
-export const UpdateApprovalRuleSchema = z.object({
-  name: z.string().min(1, 'Rule name is required').optional(),
-  minAmount: z.number().positive().optional(),
-  maxAmount: z.number().positive().optional(),
-  category: z.string().optional(),
-  ruleType: ApprovalRuleTypeSchema.optional(),
-  ruleConfig: ApprovalRuleConfigSchema.optional(),
-  isActive: z.boolean().optional(),
-}).refine((data) => {
-  // Ensure minAmount is less than maxAmount if both are provided
-  if (data.minAmount && data.maxAmount && data.minAmount >= data.maxAmount) {
-    return false;
-  }
-  return true;
-}, {
-  message: 'Minimum amount must be less than maximum amount',
-  path: ['minAmount'],
-});
+export const UpdateApprovalRuleSchema = z
+  .object({
+    name: z.string().min(1, 'Rule name is required').optional(),
+    minAmount: z.number().positive().optional(),
+    maxAmount: z.number().positive().optional(),
+    category: z.string().optional(),
+    ruleType: ApprovalRuleTypeSchema.optional(),
+    ruleConfig: ApprovalRuleConfigSchema.optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine(
+    data => {
+      // Ensure minAmount is less than maxAmount if both are provided
+      if (
+        data.minAmount &&
+        data.maxAmount &&
+        data.minAmount >= data.maxAmount
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Minimum amount must be less than maximum amount',
+      path: ['minAmount'],
+    }
+  );
 export type UpdateApprovalRuleDto = z.infer<typeof UpdateApprovalRuleSchema>;
 
 // File Upload Validation
 export const FileUploadSchema = z.object({
   fileName: z.string().min(1, 'File name is required'),
-  mimeType: z.enum(['image/jpeg', 'image/png', 'image/gif', 'application/pdf'], {
-    errorMap: () => ({ message: 'File type must be JPEG, PNG, GIF, or PDF' }),
-  }),
+  mimeType: z.enum(
+    ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'],
+    {
+      errorMap: () => ({ message: 'File type must be JPEG, PNG, GIF, or PDF' }),
+    }
+  ),
   size: z.number().max(5242880, 'File size must be less than 5MB'),
 });
 export type FileUploadDto = z.infer<typeof FileUploadSchema>;
@@ -399,7 +425,9 @@ export const ExpenseQuerySchema = z.object({
   maxAmount: z.number().positive().optional(),
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(100).default(10),
-  sortBy: z.enum(['createdAt', 'expenseDate', 'originalAmount', 'status']).default('createdAt'),
+  sortBy: z
+    .enum(['createdAt', 'expenseDate', 'originalAmount', 'status'])
+    .default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 export type ExpenseQueryDto = z.infer<typeof ExpenseQuerySchema>;
@@ -447,14 +475,16 @@ export interface ManagerDashboardData {
   pendingApprovals: number;
   teamExpenses: number;
   monthlyTeamSpend: number;
-  pendingExpensesList: Array<Expense & {
-    user?: User;
-    currentApproval?: {
-      id: string;
-      status: string;
-      createdAt: Date;
-    };
-  }>;
+  pendingExpensesList: Array<
+    Expense & {
+      user?: User;
+      currentApproval?: {
+        id: string;
+        status: string;
+        createdAt: Date;
+      };
+    }
+  >;
   teamMembers: User[];
 }
 
@@ -482,7 +512,7 @@ export interface BusinessRuleErrorData {
 
 export class ValidationError extends Error {
   public errors: ValidationErrorItem[];
-  
+
   constructor(data: { message: string; errors: ValidationErrorItem[] }) {
     super(data.message);
     this.name = 'ValidationError';
@@ -493,8 +523,12 @@ export class ValidationError extends Error {
 export class BusinessRuleError extends Error {
   public rule: string;
   public context?: Record<string, any>;
-  
-  constructor(data: { rule: string; message: string; context?: Record<string, any> }) {
+
+  constructor(data: {
+    rule: string;
+    message: string;
+    context?: Record<string, any>;
+  }) {
     super(data.message);
     this.name = 'BusinessRuleError';
     this.rule = data.rule;

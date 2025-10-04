@@ -90,7 +90,7 @@ export async function createCompanyWithAdmin(
       data: {
         email: setupData.adminUser.email,
         password: hashedPassword,
-        role: UserRole.ADMIN,
+        role: 'ADMIN',
         companyId: company.id,
         isActive: true,
       },

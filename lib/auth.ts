@@ -59,3 +59,7 @@ export async function verifyToken(request: Request): Promise<JWTPayload | null> 
   
   return verifyAccessToken(token);
 }
+
+export async function getCurrentUser(request: Request): Promise<JWTPayload | null> {
+  return verifyToken(request);
+}
