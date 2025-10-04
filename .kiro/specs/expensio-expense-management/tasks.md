@@ -195,20 +195,31 @@
     - Test expense status tracking and updates
     - _Requirements: 3.1, 3.2, 3.3, 2.6, 2.7_
 
-- [ ] 8. Approval Workflow Engine
-  - [ ] 8.1 Implement approval rule configuration system
+- [x] 8. Approval Workflow Engine
+
+
+
+
+
+  - [x] 8.1 Implement approval rule configuration system
+
+
     - Create approval rule builder for admins
     - Implement percentage-based, specific approver, and hybrid rule types
     - Add rule validation and conflict detection
     - _Requirements: 4.2, 4.3, 4.4, 2.1, 2.3_
 
-  - [ ] 8.2 Build approval workflow execution engine
+  - [x] 8.2 Build approval workflow execution engine
+
+
     - Implement sequential approval workflow processing
     - Create approval step generation based on configured rules
     - Add workflow state management and progression logic
     - _Requirements: 4.1, 4.5, 4.6, 4.7_
 
-  - [ ] 8.3 Create approval decision processing
+  - [x] 8.3 Create approval decision processing
+
+
     - Implement approval and rejection handling
     - Add approval comments and decision tracking
     - Create workflow completion and notification logic
