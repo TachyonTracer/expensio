@@ -444,3 +444,19 @@ export function withAuth(
     }
   };
 }
+
+/**
+ * Simplified authentication function for use in API routes
+ */
+export async function authenticateRequest(request: NextRequest): Promise<{
+  success: boolean;
+  user?: JWTPayload & any;
+  error?: string;
+}> {
+  const authResult = await authenticate(request);
+  return {
+    success: authResult.success,
+    user: authResult.user,
+    error: authResult.success ? undefined : 'Authentication failed',
+  };
+}

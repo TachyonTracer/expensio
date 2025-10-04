@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@/lib/db';
-import { hashPassword, generateAccessToken, generateRefreshToken } from '@/lib/auth';
+import { generateAccessToken, generateRefreshToken } from '@/lib/auth';
 import { ApiResponse, JWTPayload, CreateCompanySchema } from '@/lib/types';
+import { createCompanyWithAdmin } from '@/lib/services/company-service';
 
 const SignupSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -15,83 +15,40 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password, company } = SignupSchema.parse(body);
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'USER_EXISTS',
-            message: 'User with this email already exists',
-          },
-          timestamp: new Date().toISOString(),
-        } as ApiResponse,
-        { status: 409 }
-      );
-    }
-
-    // Hash password
-    const hashedPassword = await hashPassword(password);
-
-    // Create company and admin user in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Create company
-      const newCompany = await tx.company.create({
-        data: {
-          name: company.name,
-          country: company.country,
-          baseCurrency: company.baseCurrency,
-        },
-      });
-
-      // Create admin user
-      const newUser = await tx.user.create({
-        data: {
-          email,
-          password: hashedPassword,
-          role: 'ADMIN',
-          companyId: newCompany.id,
-        },
-        include: {
-          company: true,
-        },
-      });
-
-      return { company: newCompany, user: newUser };
+    // Create company and admin user using the service
+    const result = await createCompanyWithAdmin({
+      company,
+      adminUser: { email, password },
     });
 
     // Create JWT payload
     const jwtPayload: JWTPayload = {
-      userId: result.user.id,
-      companyId: result.user.companyId,
-      role: result.user.role,
-      email: result.user.email,
+      userId: result.adminUser.id,
+      companyId: result.company.id,
+      role: result.adminUser.role,
+      email: result.adminUser.email,
     };
 
     // Generate tokens
     const accessToken = generateAccessToken(jwtPayload);
     const refreshToken = generateRefreshToken(jwtPayload);
 
-    // Create response with user data (excluding password)
+    // Create response with user data
     const userData = {
-      id: result.user.id,
-      email: result.user.email,
-      role: result.user.role,
-      companyId: result.user.companyId,
+      id: result.adminUser.id,
+      email: result.adminUser.email,
+      role: result.adminUser.role,
+      companyId: result.company.id,
       company: {
-        id: result.user.company.id,
-        name: result.user.company.name,
-        country: result.user.company.country,
-        baseCurrency: result.user.company.baseCurrency,
+        id: result.company.id,
+        name: result.company.name,
+        country: result.company.country,
+        baseCurrency: result.company.baseCurrency,
       },
-      managerId: result.user.managerId,
-      isActive: result.user.isActive,
-      createdAt: result.user.createdAt,
-      updatedAt: result.user.updatedAt,
+      managerId: null,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     const response = NextResponse.json(
@@ -132,6 +89,20 @@ export async function POST(request: NextRequest) {
           timestamp: new Date().toISOString(),
         } as ApiResponse,
         { status: 400 }
+      );
+    }
+
+    if (error instanceof Error && error.message.includes('already exists')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CONFLICT',
+            message: error.message,
+          },
+          timestamp: new Date().toISOString(),
+        } as ApiResponse,
+        { status: 409 }
       );
     }
 

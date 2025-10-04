@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { adminOnly, authenticated } from '@/lib/route-guards';
 import { ApiResponse, CreateUserSchema, UserQuerySchema, UserRole } from '@/lib/types';
 import { generateRandomPassword, sendPasswordEmail } from '@/lib/email-utils';
+import { createTenantService } from '@/lib/services/tenant-service';
 
 // GET /api/users - List users with filtering and pagination
 export const GET = authenticated(async (request: NextRequest, user: any) => {
@@ -28,18 +28,17 @@ export const GET = authenticated(async (request: NextRequest, user: any) => {
       isActive: queryParams.isActive ? queryParams.isActive === 'true' : undefined,
     });
 
-    // Build where clause based on user role and filters
-    const whereClause: any = {
-      companyId: user.companyId, // Company-scoped access
-    };
+    // Create tenant service for company-scoped operations
+    const tenantService = createTenantService(user);
+
+    // Build where clause with role-based filtering
+    let whereClause: any = {};
 
     // Apply role-based filtering
     if (user.role === 'MANAGER') {
       // Managers can only see their direct reports and themselves
-      whereClause.OR = [
-        { id: user.userId }, // Self
-        { managerId: user.userId }, // Direct reports
-      ];
+      const accessibleUserIds = await tenantService.getAccessibleUserIds();
+      whereClause.id = { in: accessibleUserIds };
     }
     // Admins can see all users in their company (no additional filtering needed)
 
@@ -48,66 +47,46 @@ export const GET = authenticated(async (request: NextRequest, user: any) => {
     if (typeof isActive === 'boolean') whereClause.isActive = isActive;
     if (managerId) whereClause.managerId = managerId;
 
-    // Calculate pagination
-    const skip = (page - 1) * limit;
-
-    // Get users with pagination
-    const [users, totalCount] = await Promise.all([
-      prisma.user.findMany({
-        where: whereClause,
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          managerId: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          manager: {
-            select: {
-              id: true,
-              email: true,
-              role: true,
-            },
-          },
-          directReports: {
-            select: {
-              id: true,
-              email: true,
-              role: true,
-            },
-          },
-          _count: {
-            select: {
-              expenses: true,
-              directReports: true,
-            },
+    // Get users with pagination using tenant service
+    const result = await tenantService.getUsers({
+      where: whereClause,
+      include: {
+        manager: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
           },
         },
-        orderBy: {
-          [sortBy]: sortOrder,
+        directReports: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+          },
         },
-        skip,
-        take: limit,
-      }),
-      prisma.user.count({ where: whereClause }),
-    ]);
+        _count: {
+          select: {
+            expenses: true,
+            directReports: true,
+          },
+        },
+      },
+      orderBy: {
+        [sortBy]: sortOrder,
+      },
+      pagination: { page, limit },
+    });
 
-    const totalPages = Math.ceil(totalCount / limit);
+    const users = result.data;
+    const totalPages = result.pagination.totalPages;
 
     return NextResponse.json(
       {
         success: true,
         data: {
           users,
-          pagination: {
-            page,
-            limit,
-            totalCount,
-            totalPages,
-            hasNext: page < totalPages,
-            hasPrev: page > 1,
-          },
+          pagination: result.pagination,
         },
         timestamp: new Date().toISOString(),
       } as ApiResponse,
@@ -159,10 +138,14 @@ export const POST = adminOnly(async (request: NextRequest, user: any) => {
 
     const userData = CreateUserWithPasswordSchema.parse(body);
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    // Create tenant service for company-scoped operations
+    const tenantService = createTenantService(user);
+
+    // Check if user already exists (global check, not company-scoped)
+    const existingUsers = await tenantService.getUsers({
       where: { email: userData.email },
     });
+    const existingUser = Array.isArray(existingUsers) ? existingUsers[0] : null;
 
     if (existingUser) {
       return NextResponse.json(
@@ -178,18 +161,11 @@ export const POST = adminOnly(async (request: NextRequest, user: any) => {
       );
     }
 
-    // Validate manager exists if provided
+    // Validate manager exists if provided (company-scoped)
     if (userData.managerId) {
-      const manager = await prisma.user.findFirst({
-        where: {
-          id: userData.managerId,
-          companyId: user.companyId,
-          role: { in: ['ADMIN', 'MANAGER'] },
-          isActive: true,
-        },
-      });
+      const manager = await tenantService.getUserById(userData.managerId);
 
-      if (!manager) {
+      if (!manager || !['ADMIN', 'MANAGER'].includes(manager.role) || !manager.isActive) {
         return NextResponse.json(
           {
             success: false,
@@ -216,39 +192,38 @@ export const POST = adminOnly(async (request: NextRequest, user: any) => {
     // Hash password
     const hashedPassword = await hashPassword(password!);
 
-    // Create user
-    const newUser = await prisma.user.create({
-      data: {
-        email: userData.email,
-        password: hashedPassword,
-        role: userData.role,
-        companyId: user.companyId,
-        managerId: userData.managerId,
-      },
-      include: {
-        manager: {
-          select: {
-            id: true,
-            email: true,
-            role: true,
-          },
+    // Create user using tenant service
+    const newUser = await tenantService.createUser({
+      email: userData.email,
+      password: hashedPassword,
+      role: userData.role,
+      managerId: userData.managerId,
+    });
+
+    // Get the created user with relations
+    const userWithRelations = await tenantService.getUserById(newUser.id, {
+      manager: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
         },
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
+      },
+      company: {
+        select: {
+          id: true,
+          name: true,
         },
       },
     });
 
     // Send password email if requested and password was generated
-    if (userData.sendEmail && generatedPassword) {
+    if (userData.sendEmail && generatedPassword && userWithRelations) {
       try {
         await sendPasswordEmail(
-          newUser.email,
+          userWithRelations.email,
           generatedPassword,
-          newUser.company.name
+          userWithRelations.company.name
         );
       } catch (emailError) {
         console.error('Failed to send password email:', emailError);
@@ -263,7 +238,7 @@ export const POST = adminOnly(async (request: NextRequest, user: any) => {
       role: newUser.role,
       companyId: newUser.companyId,
       managerId: newUser.managerId,
-      manager: newUser.manager,
+      manager: userWithRelations?.manager,
       isActive: newUser.isActive,
       createdAt: newUser.createdAt,
       updatedAt: newUser.updatedAt,

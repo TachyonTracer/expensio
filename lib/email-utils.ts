@@ -40,6 +40,146 @@ export function generateRandomPassword(length: number = 12): string {
 }
 
 /**
+ * Send welcome email to new admin user
+ */
+export async function sendWelcomeEmail(
+  email: string,
+  companyName: string,
+  password: string
+): Promise<void> {
+  const mailOptions = {
+    from: env.FROM_EMAIL,
+    to: email,
+    subject: `Welcome to Expensio - ${companyName} Setup Complete`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to Expensio</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background-color: #059669;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            background-color: #f9fafb;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+          }
+          .success-box {
+            background-color: #d1fae5;
+            border: 1px solid #059669;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .button {
+            display: inline-block;
+            background-color: #059669;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .footer {
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🎉 Welcome to Expensio!</h1>
+          <p>Your company setup is complete</p>
+        </div>
+        
+        <div class="content">
+          <h2>Congratulations!</h2>
+          
+          <div class="success-box">
+            <strong>✅ Setup Complete!</strong><br>
+            Your company <strong>${companyName}</strong> has been successfully set up on Expensio.
+          </div>
+          
+          <p>As the administrator, you now have full access to manage your company's expense management system.</p>
+          
+          <h3>What you can do now:</h3>
+          <ul>
+            <li><strong>Add Users:</strong> Invite employees and managers to your company</li>
+            <li><strong>Configure Approval Rules:</strong> Set up expense approval workflows</li>
+            <li><strong>Manage Settings:</strong> Customize your company preferences</li>
+            <li><strong>View Analytics:</strong> Monitor company-wide expense trends</li>
+          </ul>
+          
+          <p>
+            <a href="${env.NEXT_PUBLIC_APP_URL}/dashboard" class="button">
+              Access Your Dashboard
+            </a>
+          </p>
+          
+          <h3>Next Steps:</h3>
+          <ol>
+            <li>Log in to your admin dashboard</li>
+            <li>Add your team members</li>
+            <li>Set up approval workflows</li>
+            <li>Start managing expenses efficiently!</li>
+          </ol>
+          
+          <p>If you need any assistance getting started, our support team is here to help.</p>
+        </div>
+        
+        <div class="footer">
+          <p>Thank you for choosing Expensio for your expense management needs!</p>
+          <p>This email was sent to confirm your company setup completion.</p>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `
+Welcome to Expensio - ${companyName}
+
+Congratulations! Your company setup is complete.
+
+As the administrator, you can now:
+- Add users to your company
+- Configure approval rules
+- Manage company settings
+- View expense analytics
+
+Access your dashboard: ${env.NEXT_PUBLIC_APP_URL}/dashboard
+
+Next Steps:
+1. Log in to your admin dashboard
+2. Add your team members
+3. Set up approval workflows
+4. Start managing expenses!
+
+Thank you for choosing Expensio!
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+}
+
+/**
  * Send password email to new user
  */
 export async function sendPasswordEmail(
