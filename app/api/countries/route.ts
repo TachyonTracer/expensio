@@ -1,86 +1,133 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createApiResponse } from '@/lib/api-response';
 import { currencyService } from '@/lib/services/currency.service';
-import { ApiResponse } from '@/lib/types';
-import { API_ERROR_CODES } from '@/lib/constants';
 
-/**
- * GET /api/countries
- * Get countries and their currencies
- */
-export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse>> {
-  try {
-    const { searchParams } = new URL(request.url);
-    const includeMapping = searchParams.get('mapping') === 'true';
-    const country = searchParams.get('country');
+type CountryData = Awaited<ReturnType<typeof currencyService.fetchCountriesData>>[number];
 
-    if (country) {
-      // Get primary currency for a specific country
-      const primaryCurrency = await currencyService.getPrimaryCurrencyForCountry(country);
-      
-      if (!primaryCurrency) {
-        return NextResponse.json({
-          success: false,
-          error: {
-            code: API_ERROR_CODES.RESOURCE_NOT_FOUND,
-            message: `Country '${country}' not found or has no currency data`,
-            details: { country }
-          },
-          timestamp: new Date().toISOString()
-        }, { status: 404 });
-      }
+interface CountryCurrency {
+  code: string;
+  name: string;
+  symbol: string;
+}
 
-      return NextResponse.json({
-        success: true,
-        data: {
-          country,
-          primaryCurrency,
-          timestamp: new Date().toISOString()
-        },
-        timestamp: new Date().toISOString()
-      });
-    }
+interface CountrySummary {
+  name: {
+    common: string;
+    official?: string;
+  };
+  currencies: CountryCurrency[];
+}
 
-    // Get all countries data
-    const countriesData = await currencyService.fetchCountriesData();
-    
-    // Keep the original structure that frontend components expect
-    const countries = countriesData.map(country => ({
+function toCountrySummaries(countries: CountryData[]): CountrySummary[] {
+  return countries
+    .filter(country => country?.name?.common)
+    .map<CountrySummary>(country => ({
       name: {
         common: country.name.common,
-        official: country.name.official
+        official: country.name.official,
       },
-      currencies: country.currencies ? Object.entries(country.currencies).map(([code, info]) => ({
-        code,
-        name: info.name,
-        symbol: info.symbol
-      })) : []
-    })).sort((a, b) => a.name.common.localeCompare(b.name.common));
+      currencies: country.currencies
+        ? Object.entries(country.currencies).map(([code, info]) => ({
+            code,
+            name: info.name,
+            symbol: info.symbol ?? code,
+          }))
+        : [],
+    }))
+    .filter(country => country.currencies.length > 0)
+    .sort((a, b) => a.name.common.localeCompare(b.name.common));
+}
 
-    let responseData: any = countries;
+function buildCurrencyMapping(countries: CountrySummary[]): Record<string, string[]> {
+  return countries.reduce<Record<string, string[]>>((mapping, country) => {
+    mapping[country.name.common] = country.currencies.map(currency => currency.code);
+    return mapping;
+  }, {});
+}
 
-    // Include country-currency mapping if requested
+const FALLBACK_COUNTRIES: CountrySummary[] = [
+  {
+    name: { common: 'United States' },
+    currencies: [
+      { code: 'USD', name: 'United States Dollar', symbol: '$' },
+    ],
+  },
+  {
+    name: { common: 'United Kingdom' },
+    currencies: [
+      { code: 'GBP', name: 'British Pound Sterling', symbol: '£' },
+    ],
+  },
+  {
+    name: { common: 'Canada' },
+    currencies: [
+      { code: 'CAD', name: 'Canadian Dollar', symbol: '$' },
+    ],
+  },
+  {
+    name: { common: 'Australia' },
+    currencies: [
+      { code: 'AUD', name: 'Australian Dollar', symbol: '$' },
+    ],
+  },
+  {
+    name: { common: 'Germany' },
+    currencies: [
+      { code: 'EUR', name: 'Euro', symbol: '€' },
+    ],
+  },
+  {
+    name: { common: 'France' },
+    currencies: [
+      { code: 'EUR', name: 'Euro', symbol: '€' },
+    ],
+  },
+  {
+    name: { common: 'Japan' },
+    currencies: [
+      { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+    ],
+  },
+  {
+    name: { common: 'India' },
+    currencies: [
+      { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
+    ],
+  },
+];
+
+const FALLBACK_MAPPING = buildCurrencyMapping(FALLBACK_COUNTRIES);
+
+// GET /api/countries - Get list of countries with currencies
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const includeMapping = searchParams.get('includeMapping') === 'true';
+
+  try {
+    const countriesData = await currencyService.fetchCountriesData();
+    const countries = toCountrySummaries(countriesData);
+
+    let mapping: Record<string, string[]> | undefined;
+
     if (includeMapping) {
-      const mapping = await currencyService.getCountryCurrencyMapping();
-      responseData.mapping = mapping;
+      try {
+        mapping = await currencyService.getCountryCurrencyMapping();
+      } catch (mappingError) {
+        console.warn('Failed to fetch country currency mapping, deriving from country list instead.', mappingError);
+        mapping = buildCurrencyMapping(countries);
+      }
     }
 
-    return NextResponse.json({
-      success: true,
-      data: responseData,
-      timestamp: new Date().toISOString()
-    });
+    const payload = includeMapping ? { countries, mapping } : countries;
 
+    return NextResponse.json(createApiResponse(true, payload));
   } catch (error) {
-    console.error('Error in GET /api/countries:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: {
-        code: API_ERROR_CODES.EXTERNAL_SERVICE_ERROR,
-        message: error instanceof Error ? error.message : 'Failed to fetch countries data',
-        details: { endpoint: '/api/countries' }
-      },
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+    console.error('Failed to fetch countries data, serving fallback list.', error);
+
+    const payload = includeMapping
+      ? { countries: FALLBACK_COUNTRIES, mapping: FALLBACK_MAPPING }
+      : FALLBACK_COUNTRIES;
+
+    return NextResponse.json(createApiResponse(true, payload));
   }
 }
