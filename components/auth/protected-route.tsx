@@ -23,20 +23,18 @@ export function ProtectedRoute({
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        
-        if (!token) {
-          setIsAuthenticated(false);
-          setIsLoading(false);
-          return;
+        const storedToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        const headers: Record<string, string> = {};
+
+        if (storedToken) {
+          headers['Authorization'] = `Bearer ${storedToken}`;
         }
 
-        // Verify token with the server
         const response = await fetch('/api/auth/verify', {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers,
+          credentials: 'include',
+          cache: 'no-store',
         });
 
         if (response.ok) {
@@ -44,47 +42,38 @@ export function ProtectedRoute({
           if (result.success) {
             setUserPayload(result.data);
             setIsAuthenticated(true);
-          } else {
-            // Token is invalid, remove it
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            setIsAuthenticated(false);
+            return;
           }
-        } else if (response.status === 401) {
-          // Try to refresh the token
-          const refreshToken = localStorage.getItem('refreshToken');
-          if (refreshToken) {
-            const refreshResponse = await fetch('/api/auth/refresh', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ refreshToken }),
-            });
-
-            if (refreshResponse.ok) {
-              const refreshResult = await refreshResponse.json();
-              if (refreshResult.success) {
-                localStorage.setItem('accessToken', refreshResult.data.accessToken);
-                localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
-                setUserPayload(refreshResult.data.user);
-                setIsAuthenticated(true);
-              } else {
-                localStorage.removeItem('accessToken');
-                localStorage.removeItem('refreshToken');
-                setIsAuthenticated(false);
-              }
-            } else {
-              localStorage.removeItem('accessToken');
-              localStorage.removeItem('refreshToken');
-              setIsAuthenticated(false);
-            }
-          } else {
-            setIsAuthenticated(false);
-          }
-        } else {
-          setIsAuthenticated(false);
         }
+
+        if (response.status === 401) {
+          const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+          const refreshBody = refreshToken ? { refreshToken } : {};
+
+          const refreshResponse = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(refreshBody),
+            credentials: 'include',
+          });
+
+          if (refreshResponse.ok) {
+            const refreshResult = await refreshResponse.json();
+            if (refreshResult.success) {
+              localStorage.setItem('accessToken', refreshResult.data.accessToken);
+              localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
+              setUserPayload(refreshResult.data.user);
+              setIsAuthenticated(true);
+              return;
+            }
+          }
+        }
+
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        setIsAuthenticated(false);
       } catch (error) {
         console.error('Auth check failed:', error);
         setIsAuthenticated(false);
@@ -98,7 +87,9 @@ export function ProtectedRoute({
 
   useEffect(() => {
     if (isAuthenticated === false) {
-      router.push('/auth/login');
+      const currentPath = window.location.pathname;
+      const loginUrl = `/auth/login${currentPath !== '/' ? `?redirect=${encodeURIComponent(currentPath)}` : ''}`;
+      router.push(loginUrl);
     }
   }, [isAuthenticated, router]);
 
@@ -161,7 +152,7 @@ export function ProtectedRoute({
             </div>
             <h3 className="mt-2 text-sm font-medium text-gray-900">Access Denied</h3>
             <p className="mt-1 text-sm text-gray-500">
-              You don't have permission to access this page.
+              You don&apos;t have permission to access this page.
             </p>
             <div className="mt-6">
               <button
@@ -189,26 +180,55 @@ export function useAuth() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        
-        if (!token) {
-          setIsLoading(false);
-          return;
+        const storedToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        const headers: Record<string, string> = {};
+
+        if (storedToken) {
+          headers['Authorization'] = `Bearer ${storedToken}`;
         }
 
         const response = await fetch('/api/auth/verify', {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers,
+          credentials: 'include',
+          cache: 'no-store',
         });
 
         if (response.ok) {
           const result = await response.json();
           if (result.success) {
             setUser(result.data);
+            return;
           }
         }
+
+        if (response.status === 401) {
+          const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+          const refreshBody = refreshToken ? { refreshToken } : {};
+
+          const refreshResponse = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(refreshBody),
+            credentials: 'include',
+          });
+
+          if (refreshResponse.ok) {
+            const refreshResult = await refreshResponse.json();
+            if (refreshResult.success) {
+              localStorage.setItem('accessToken', refreshResult.data.accessToken);
+              localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
+              setUser(refreshResult.data.user);
+              return;
+            }
+          }
+        }
+
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        setUser(null);
       } catch (error) {
         console.error('Auth check failed:', error);
       } finally {
@@ -222,8 +242,13 @@ export function useAuth() {
   const logout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    setUser(null);
-    window.location.href = '/auth/login';
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    }).finally(() => {
+      setUser(null);
+      window.location.href = '/auth/login';
+    });
   };
 
   return {

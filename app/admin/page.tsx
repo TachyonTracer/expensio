@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { ProtectedRoute } from '@/components/auth/protected-route';
+import { useRouter } from 'next/navigation';
+import { ProtectedRoute, useAuth } from '@/components/auth/protected-route';
 import { UserManagement } from '@/components/admin/user-management';
 import { ApprovalRuleBuilder } from '@/components/admin/approval-rule-builder';
 import { CompanySettings } from '@/components/admin/company-settings';
 import { ThemeSelector } from '@/components/theme/theme-toggle';
+import { LogOut } from 'lucide-react';
 
 type TabType = 'users' | 'rules' | 'settings';
 
@@ -91,6 +93,12 @@ const TAB_ICONS: Record<TabType, () => React.JSX.Element> = {
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>('users');
+  const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+  };
 
   return (
     <ProtectedRoute requiredRole="ADMIN">
@@ -109,6 +117,14 @@ export default function AdminPage() {
               </div>
               <div className="flex items-center space-x-3">
                 <ThemeSelector />
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </button>
                 <div className="bg-card rounded-lg shadow px-4 py-2 border border-border">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">

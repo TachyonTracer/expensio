@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
+import { AlertCircle, CheckCircle2, Circle, Loader2, ShieldCheck } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const SignupSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -12,7 +15,11 @@ const SignupSchema = z.object({
   confirmPassword: z.string(),
   companyName: z.string().min(1, 'Company name is required'),
   country: z.string().min(1, 'Country is required'),
-  acceptTerms: z.boolean().refine(val => val === true, 'You must accept the terms and conditions'),
+  baseCurrency: z
+    .string()
+    .length(3, 'Base currency is required')
+    .transform((value) => value.toUpperCase()),
+  acceptTerms: z.boolean().refine((val) => val === true, 'You must accept the terms and conditions'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -20,61 +27,194 @@ const SignupSchema = z.object({
 
 type SignupFormData = z.infer<typeof SignupSchema>;
 
-interface Country {
-  name: { common: string };
-  currencies: Record<string, { name: string; symbol: string }>;
+interface CountryCurrency {
+  code: string;
+  name: string;
+  symbol: string;
 }
 
-export function SignupForm() {
+interface Country {
+  name: { common: string };
+  currencies: CountryCurrency[];
+}
+
+interface SignupFormProps {
+  className?: string;
+  cardClassName?: string;
+  appearance?: 'light' | 'dark';
+}
+
+function evaluatePasswordStrength(password: string) {
+  const rules = [
+    {
+      label: 'At least 8 characters',
+      met: password.length >= 8,
+    },
+    {
+      label: 'Includes a lowercase letter',
+      met: /[a-z]/.test(password),
+    },
+    {
+      label: 'Includes an uppercase letter',
+      met: /[A-Z]/.test(password),
+    },
+    {
+      label: 'Includes a number',
+      met: /\d/.test(password),
+    },
+    {
+      label: 'Includes a symbol',
+      met: /[^A-Za-z0-9]/.test(password),
+    },
+  ];
+
+  const metCount = rules.filter((rule) => rule.met).length;
+  const percentage = password ? Math.round((metCount / rules.length) * 100) : 0;
+
+  let label = 'Create a strong password';
+  let indicator = 'bg-red-500';
+
+  if (percentage >= 20 && percentage < 60) {
+    label = 'Password strength: Fair';
+    indicator = 'bg-amber-500';
+  } else if (percentage >= 60 && percentage < 80) {
+    label = 'Password strength: Good';
+    indicator = 'bg-sky-500';
+  } else if (percentage >= 80) {
+    label = 'Password strength: Great';
+    indicator = 'bg-emerald-500';
+  } else if (password && percentage < 20) {
+    label = 'Password strength: Weak';
+  }
+
+  return {
+    rules,
+    percentage,
+    label,
+    indicator,
+  };
+}
+
+export function SignupForm({ className, cardClassName, appearance = 'light' }: SignupFormProps) {
+  const isDark = appearance === 'dark';
+
   const [formData, setFormData] = useState<SignupFormData>({
     email: '',
     password: '',
     confirmPassword: '',
     companyName: '',
     country: '',
+    baseCurrency: '',
     acceptTerms: false,
   });
-  const [errors, setErrors] = useState<Partial<SignupFormData>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof SignupFormData, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [countries, setCountries] = useState<Country[]>([]);
   const [loadingCountries, setLoadingCountries] = useState(true);
+  const [countriesError, setCountriesError] = useState<string | null>(null);
+  const [formMessage, setFormMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [availableCurrencies, setAvailableCurrencies] = useState<CountryCurrency[]>([]);
   const router = useRouter();
 
-  // Load countries on component mount
-  useState(() => {
+  useEffect(() => {
     const loadCountries = async () => {
       try {
         const response = await fetch('/api/countries');
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            setCountries(result.data);
-          }
+        if (!response.ok) {
+          throw new Error('Failed to fetch countries');
+        }
+
+        const result = await response.json();
+        if (result.success && Array.isArray(result.data)) {
+          const normalizedCountries = result.data.map((country: any) => {
+            const currencyArray: CountryCurrency[] = Array.isArray(country.currencies)
+              ? country.currencies
+              : country.currencies
+                ? Object.entries(country.currencies).map(([code, info]: [string, any]) => ({
+                    code,
+                    name: info.name,
+                    symbol: info.symbol ?? code,
+                  }))
+                : [];
+
+            return {
+              ...country,
+              currencies: currencyArray,
+            } as Country;
+          });
+
+          const sortedCountries = normalizedCountries.sort((a: Country, b: Country) =>
+            a.name.common.localeCompare(b.name.common)
+          );
+
+          setCountries(sortedCountries);
+        } else {
+          throw new Error('Unexpected response format');
         }
       } catch (error) {
         console.error('Failed to load countries:', error);
+        setCountriesError('We were unable to load the country list. You can type it manually.');
       } finally {
         setLoadingCountries(false);
       }
     };
 
     loadCountries();
-  });
+  }, []);
+
+  const passwordStrength = useMemo(() => evaluatePasswordStrength(formData.password), [formData.password]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
     
+    const nextValue = type === 'checkbox' ? checked : value;
+    const normalizedValue =
+      name === 'baseCurrency' && typeof nextValue === 'string'
+        ? nextValue.toUpperCase()
+        : nextValue;
+
     setFormData(prev => ({ 
       ...prev, 
-      [name]: type === 'checkbox' ? checked : value 
-    }));
+      [name]: normalizedValue,
+    } as SignupFormData));
     
     // Clear error when user starts typing
     if (errors[name as keyof SignupFormData]) {
       setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
+
+    if (formMessage) {
+      setFormMessage(null);
+    }
+  };
+
+  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedCountry = e.target.value;
+    const countryEntry = countries.find((country) => country.name.common === selectedCountry);
+    const currencies = countryEntry?.currencies ?? [];
+    const detectedCurrency = currencies[0]?.code ?? '';
+
+    setAvailableCurrencies(currencies);
+
+    setFormData((prev) => ({
+      ...prev,
+      country: selectedCountry,
+      baseCurrency: detectedCurrency,
+    }));
+
+    if (errors.country || errors.baseCurrency) {
+      setErrors((prev) => ({
+        ...prev,
+        country: undefined,
+        baseCurrency: undefined,
+      }));
+    }
+
+    if (formMessage) {
+      setFormMessage(null);
     }
   };
 
@@ -85,7 +225,7 @@ export function SignupForm() {
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const fieldErrors: Partial<SignupFormData> = {};
+        const fieldErrors: Partial<Record<keyof SignupFormData, string>> = {};
         error.errors.forEach((err) => {
           if (err.path[0]) {
             fieldErrors[err.path[0] as keyof SignupFormData] = err.message;
@@ -103,6 +243,7 @@ export function SignupForm() {
     if (!validateForm()) return;
 
     setIsLoading(true);
+    setFormMessage(null);
     
     try {
       const response = await fetch('/api/auth/signup', {
@@ -113,8 +254,11 @@ export function SignupForm() {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          companyName: formData.companyName,
-          country: formData.country,
+          company: {
+            name: formData.companyName,
+            country: formData.country,
+            baseCurrency: formData.baseCurrency,
+          },
         }),
       });
 
@@ -125,16 +269,38 @@ export function SignupForm() {
         localStorage.setItem('accessToken', result.data.accessToken);
         localStorage.setItem('refreshToken', result.data.refreshToken);
         
+        setFormMessage({ type: 'success', text: 'Account created! Redirecting you to onboarding...' });
         router.push('/onboarding/company-setup');
       } else {
-        setErrors({ 
-          email: result.error?.message || 'Signup failed. Please try again.' 
-        });
+        const message = result.error?.message || 'Signup failed. Please try again.';
+        setFormMessage({ type: 'error', text: message });
+
+        const fieldErrors: Partial<Record<keyof SignupFormData, string>> = {};
+
+        if (Array.isArray(result.error?.details)) {
+          result.error.details.forEach((detail: { path?: Array<string | number>; message: string }) => {
+            const [first, second] = detail.path || [];
+
+            if (typeof first === 'string') {
+              if (first === 'company' && typeof second === 'string') {
+                if (second === 'name') fieldErrors.companyName = detail.message;
+                if (second === 'country') fieldErrors.country = detail.message;
+                if (second === 'baseCurrency') fieldErrors.baseCurrency = detail.message;
+              } else if (first in formData) {
+                fieldErrors[first as keyof SignupFormData] = detail.message;
+              }
+            }
+          });
+        }
+
+        if (Object.keys(fieldErrors).length === 0) {
+          fieldErrors.email = message;
+        }
+
+        setErrors(prev => ({ ...prev, ...fieldErrors }));
       }
     } catch (error) {
-      setErrors({ 
-        email: 'Network error. Please try again.' 
-      });
+      setFormMessage({ type: 'error', text: 'Network error. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -142,20 +308,56 @@ export function SignupForm() {
 
   const handleGoogleSignup = async () => {
     // TODO: Implement Google OAuth integration
-    console.log('Google signup not implemented yet');
+    setFormMessage({ type: 'error', text: 'Google signup is coming soon. Please use email signup for now.' });
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="bg-white rounded-lg shadow-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Create Account</h1>
-          <p className="text-gray-600 mt-2">Start managing expenses with Expensio</p>
+    <div className={cn('w-full max-w-md mx-auto', className)}>
+      <div
+        className={cn(
+          'rounded-2xl p-8',
+          isDark
+            ? 'border border-white/10 bg-slate-900/70 shadow-[0_25px_70px_-35px_rgba(8,47,73,0.65)] backdrop-blur'
+            : 'bg-white shadow-xl ring-1 ring-slate-100',
+          cardClassName
+        )}
+      >
+        <div className="text-center mb-8 space-y-2">
+          <h1 className={cn('text-2xl font-bold', isDark ? 'text-white' : 'text-gray-900')}>Create Account</h1>
+          <p className={cn('text-sm', isDark ? 'text-slate-300' : 'text-gray-600')}>
+            Start managing expenses with Expensio
+          </p>
         </div>
+
+        {formMessage && (
+          <div
+            className={cn(
+              'mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm',
+              formMessage.type === 'error'
+                ? isDark
+                  ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                  : 'border-red-200 bg-red-50 text-red-700'
+                : isDark
+                  ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            )}
+            role={formMessage.type === 'error' ? 'alert' : 'status'}
+          >
+            {formMessage.type === 'error' ? (
+              <AlertCircle className={cn('h-4 w-4 flex-none mt-0.5', isDark ? 'text-red-200' : '')} />
+            ) : (
+              <ShieldCheck className={cn('h-4 w-4 flex-none mt-0.5', isDark ? 'text-emerald-200' : '')} />
+            )}
+            <span className={cn(isDark ? 'text-slate-100' : '')}>{formMessage.text}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="email"
+              className={cn('block text-sm font-medium mb-2', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
               Email Address
             </label>
             <input
@@ -164,19 +366,26 @@ export function SignupForm() {
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.email ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={cn(
+                'w-full rounded-lg px-4 py-2.5 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                isDark
+                  ? 'border border-white/15 bg-white/10 text-white placeholder:text-slate-400 focus:ring-emerald-300 focus:border-emerald-300'
+                  : 'border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:ring-slate-900 focus:border-slate-900',
+                errors.email && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+              )}
               placeholder="Enter your email"
               disabled={isLoading}
             />
             {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>{errors.email}</p>
             )}
           </div>
 
           <div>
-            <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="companyName"
+              className={cn('block text-sm font-medium mb-2', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
               Company Name
             </label>
             <input
@@ -185,32 +394,45 @@ export function SignupForm() {
               name="companyName"
               value={formData.companyName}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.companyName ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={cn(
+                'w-full rounded-lg px-4 py-2.5 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                isDark
+                  ? 'border border-white/15 bg-white/10 text-white placeholder:text-slate-400 focus:ring-emerald-300 focus:border-emerald-300'
+                  : 'border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:ring-slate-900 focus:border-slate-900',
+                errors.companyName && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+              )}
               placeholder="Enter your company name"
               disabled={isLoading}
             />
             {errors.companyName && (
-              <p className="mt-1 text-sm text-red-600">{errors.companyName}</p>
+              <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>{errors.companyName}</p>
             )}
           </div>
 
           <div>
-            <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="country"
+              className={cn('block text-sm font-medium mb-2', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
               Country
             </label>
             <select
               id="country"
               name="country"
               value={formData.country}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.country ? 'border-red-500' : 'border-gray-300'
-              }`}
+              onChange={handleCountryChange}
+              className={cn(
+                'w-full rounded-lg px-4 py-2.5 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                isDark
+                  ? 'border border-white/15 bg-white/10 text-white focus:ring-emerald-300 focus:border-emerald-300'
+                  : 'border border-gray-300 bg-white text-gray-900 focus:ring-slate-900 focus:border-slate-900',
+                errors.country && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+              )}
               disabled={isLoading || loadingCountries}
             >
-              <option value="">Select your country</option>
+              <option value="">
+                {loadingCountries ? 'Loading countries…' : 'Select your country'}
+              </option>
               {countries && countries.map((country) => (
                 <option key={country.name.common} value={country.name.common}>
                   {country.name.common}
@@ -218,12 +440,68 @@ export function SignupForm() {
               ))}
             </select>
             {errors.country && (
-              <p className="mt-1 text-sm text-red-600">{errors.country}</p>
+              <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>{errors.country}</p>
+            )}
+            {countriesError && !errors.country && (
+              <p className={cn('mt-1 text-sm', isDark ? 'text-amber-300' : 'text-amber-600')}>{countriesError}</p>
             )}
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="baseCurrency"
+              className={cn('block text-sm font-medium mb-2', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
+              Base Currency
+            </label>
+            {availableCurrencies.length > 0 ? (
+              <select
+                id="baseCurrency"
+                name="baseCurrency"
+                value={formData.baseCurrency}
+                onChange={handleInputChange}
+                className={cn(
+                  'w-full rounded-lg px-4 py-2.5 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                  isDark
+                    ? 'border border-white/15 bg-white/10 text-white focus:ring-emerald-300 focus:border-emerald-300'
+                    : 'border border-gray-300 bg-white text-gray-900 focus:ring-slate-900 focus:border-slate-900',
+                  errors.baseCurrency && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+                )}
+                disabled={isLoading}
+              >
+                {availableCurrencies.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.code} — {currency.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id="baseCurrency"
+                name="baseCurrency"
+                value={formData.baseCurrency}
+                onChange={handleInputChange}
+                placeholder={formData.country ? 'Currency unavailable — type code' : 'Select a country first'}
+                className={cn(
+                  'w-full rounded-lg px-4 py-2.5 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                  isDark
+                    ? 'border border-white/15 bg-white/10 text-white placeholder:text-slate-400 focus:ring-emerald-300 focus:border-emerald-300'
+                    : 'border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:ring-slate-900 focus:border-slate-900',
+                  errors.baseCurrency && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+                )}
+                disabled={isLoading}
+              />
+            )}
+            {errors.baseCurrency && (
+              <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>{errors.baseCurrency}</p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className={cn('block text-sm font-medium mb-2', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
               Password
             </label>
             <div className="relative">
@@ -233,16 +511,23 @@ export function SignupForm() {
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 ${
-                  errors.password ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={cn(
+                  'w-full rounded-lg px-4 py-2.5 pr-12 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                  isDark
+                    ? 'border border-white/15 bg-white/10 text-white placeholder:text-slate-400 focus:ring-emerald-300 focus:border-emerald-300'
+                    : 'border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:ring-slate-900 focus:border-slate-900',
+                  errors.password && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+                )}
                 placeholder="Create a password"
                 disabled={isLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                className={cn(
+                  'absolute inset-y-0 right-0 pr-3 flex items-center transition',
+                  isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-600'
+                )}
                 disabled={isLoading}
               >
                 {showPassword ? (
@@ -258,12 +543,46 @@ export function SignupForm() {
               </button>
             </div>
             {errors.password && (
-              <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+              <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>{errors.password}</p>
             )}
+            <div className="mt-3">
+              <div
+                className={cn(
+                  'flex items-center justify-between text-xs font-medium',
+                  isDark ? 'text-slate-300' : 'text-gray-500'
+                )}
+              >
+                <span>{passwordStrength.label}</span>
+                <span className={isDark ? 'text-slate-200' : ''}>{passwordStrength.percentage}%</span>
+              </div>
+              <div className={cn('mt-1 h-2 w-full rounded-full', isDark ? 'bg-white/10' : 'bg-gray-100')}>
+                <div
+                  className={cn('h-full rounded-full transition-all duration-300', passwordStrength.indicator)}
+                  style={{ width: `${passwordStrength.percentage}%` }}
+                />
+              </div>
+              <ul className={cn('mt-3 space-y-1 text-xs', isDark ? 'text-slate-300' : 'text-gray-600')}>
+                {passwordStrength.rules.map((rule) => (
+                  <li key={rule.label} className="flex items-center gap-2">
+                    {rule.met ? (
+                      <CheckCircle2 className={cn('h-3.5 w-3.5', isDark ? 'text-emerald-300' : 'text-emerald-500')} />
+                    ) : (
+                      <Circle className={cn('h-3.5 w-3.5', isDark ? 'text-slate-500' : 'text-gray-400')} />
+                    )}
+                    <span className={rule.met ? (isDark ? 'text-slate-200' : 'text-gray-700') : undefined}>
+                      {rule.label}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="confirmPassword"
+              className={cn('block text-sm font-medium mb-2', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
               Confirm Password
             </label>
             <div className="relative">
@@ -273,16 +592,23 @@ export function SignupForm() {
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 ${
-                  errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={cn(
+                  'w-full rounded-lg px-4 py-2.5 pr-12 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                  isDark
+                    ? 'border border-white/15 bg-white/10 text-white placeholder:text-slate-400 focus:ring-emerald-300 focus:border-emerald-300'
+                    : 'border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:ring-slate-900 focus:border-slate-900',
+                  errors.confirmPassword && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+                )}
                 placeholder="Confirm your password"
                 disabled={isLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                className={cn(
+                  'absolute inset-y-0 right-0 pr-3 flex items-center transition',
+                  isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-600'
+                )}
                 disabled={isLoading}
               >
                 {showConfirmPassword ? (
@@ -298,7 +624,9 @@ export function SignupForm() {
               </button>
             </div>
             {errors.confirmPassword && (
-              <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+              <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>
+                {errors.confirmPassword}
+              </p>
             )}
           </div>
 
@@ -309,34 +637,57 @@ export function SignupForm() {
               type="checkbox"
               checked={formData.acceptTerms}
               onChange={handleInputChange}
-              className={`h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded ${
-                errors.acceptTerms ? 'border-red-500' : ''
-              }`}
+              className={cn(
+                'h-4 w-4 rounded border focus:ring-2 focus:ring-offset-1',
+                isDark
+                  ? 'border-white/20 bg-white/5 text-emerald-400 focus:ring-emerald-300 focus:ring-offset-slate-900'
+                  : 'border-gray-300 text-emerald-600 focus:ring-emerald-500',
+                errors.acceptTerms && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+              )}
               disabled={isLoading}
             />
-            <label htmlFor="acceptTerms" className="ml-2 block text-sm text-gray-700">
+            <label
+              htmlFor="acceptTerms"
+              className={cn('ml-3 block text-sm', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
               I agree to the{' '}
-              <Link href="/terms" className="text-blue-600 hover:text-blue-500">
+              <Link href="/terms" className={cn('font-medium', isDark ? 'text-emerald-300 hover:text-emerald-200' : 'text-blue-600 hover:text-blue-500')}>
                 Terms of Service
               </Link>{' '}
               and{' '}
-              <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
+              <Link href="/privacy" className={cn('font-medium', isDark ? 'text-emerald-300 hover:text-emerald-200' : 'text-blue-600 hover:text-blue-500')}>
                 Privacy Policy
               </Link>
             </label>
           </div>
           {errors.acceptTerms && (
-            <p className="mt-1 text-sm text-red-600">{errors.acceptTerms}</p>
+            <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>{errors.acceptTerms}</p>
           )}
+
+          <div
+            className={cn(
+              'rounded-lg px-3 py-2 text-xs',
+              isDark
+                ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                : 'border border-emerald-100 bg-emerald-50 text-emerald-700'
+            )}
+          >
+            <div className="flex items-start gap-2">
+              <ShieldCheck className={cn('mt-0.5 h-4 w-4 flex-none', isDark ? 'text-emerald-200' : 'text-emerald-600')} />
+              <span className={cn(isDark ? 'text-emerald-100' : '')}>
+                Expensio keeps your expense data protected with SOC 2-ready security controls.
+              </span>
+            </div>
+          </div>
 
           <Button
             type="submit"
-            className="w-full"
+            className={cn('w-full', isDark ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300' : '')}
             disabled={isLoading}
           >
             {isLoading ? (
               <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Creating account...
               </div>
             ) : (
@@ -347,18 +698,30 @@ export function SignupForm() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
+                <div className={cn('w-full border-t', isDark ? 'border-white/10' : 'border-gray-300')} />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span
+                  className={cn(
+                    'px-2 text-sm',
+                    isDark ? 'bg-slate-900/80 text-slate-300' : 'bg-white text-gray-500'
+                  )}
+                >
+                  Or continue with
+                </span>
               </div>
             </div>
 
             <div className="mt-6">
               <Button
                 type="button"
-                variant="outline"
-                className="w-full"
+                variant={isDark ? 'ghost' : 'outline'}
+                className={cn(
+                  'w-full border rounded-lg',
+                  isDark
+                    ? 'border-white/15 bg-white/5 text-slate-100 hover:bg-white/10'
+                    : 'border-gray-300 bg-white text-gray-700'
+                )}
                 onClick={handleGoogleSignup}
                 disabled={isLoading}
               >
@@ -387,11 +750,14 @@ export function SignupForm() {
         </form>
 
         <div className="mt-8 text-center">
-          <p className="text-sm text-gray-600">
+          <p className={cn('text-sm', isDark ? 'text-slate-300' : 'text-gray-600')}>
             Already have an account?{' '}
             <Link
               href="/auth/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
+              className={cn(
+                'font-medium',
+                isDark ? 'text-emerald-300 hover:text-emerald-200' : 'text-blue-600 hover:text-blue-500'
+              )}
             >
               Sign in
             </Link>

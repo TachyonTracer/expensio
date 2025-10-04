@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:admin@localhost:5432/expensio_db?schema=public"
 }
 
 model Company {
@@ -15,6 +15,9 @@ model Company {
   name         String
   country      String
   baseCurrency String   @map("base_currency")
+  industry     String?  @map("industry")
+  employeeCount String? @map("employee_count")
+  timeZone     String?  @map("time_zone")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

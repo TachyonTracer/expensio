@@ -5,6 +5,8 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 import Analytics from "@/components/Analytics";
 import ResponsiveTest from "@/components/ResponsiveTest";
+import { BreadcrumbProvider } from "@/lib/hooks/use-breadcrumb";
+import { AnimationProvider } from "@/lib/hooks/use-animation-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -92,7 +94,16 @@ export default function RootLayout({
       >
         <Analytics />
         <PerformanceMonitor />
-        {children}
+        <ThemeProvider
+          defaultTheme="system"
+          storageKey="expensio-theme"
+        >
+          <AnimationProvider>
+            <BreadcrumbProvider>
+              {children}
+            </BreadcrumbProvider>
+          </AnimationProvider>
+        </ThemeProvider>
         <ResponsiveTest />
       </body>
     </html>

@@ -107,6 +107,15 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
 
+    // Set new access token cookie
+    response.cookies.set('access_token', newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60,
+      path: '/',
+    });
+
     // Set new refresh token as httpOnly cookie
     response.cookies.set('refreshToken', newRefreshToken, {
       httpOnly: true,

@@ -35,7 +35,15 @@ export async function authenticate(request: NextRequest): Promise<{
   try {
     // Extract token from Authorization header
     const authHeader = request.headers.get('authorization');
-    const token = extractTokenFromHeader(authHeader);
+    let token = extractTokenFromHeader(authHeader);
+
+    // Fall back to httpOnly cookie for SSR and same-origin requests
+    if (!token) {
+      const cookieToken = request.cookies.get('access_token');
+      if (cookieToken?.value) {
+        token = cookieToken.value;
+      }
+    }
 
     if (!token) {
       return {

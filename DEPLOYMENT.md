@@ -54,11 +54,12 @@
    DATABASE_URL=your_production_database_url
    JWT_SECRET=your_production_jwt_secret
    JWT_REFRESH_SECRET=your_production_refresh_secret
+   # Email (optional - remove these if you don't want to send emails)
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
    SMTP_USER=your_email@gmail.com
    SMTP_PASS=your_app_password
-   SMTP_FROM=noreply@expensio.com
+   FROM_EMAIL=noreply@expensio.com
    CONTACT_EMAIL=hello@expensio.com
    NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
    GOOGLE_SITE_VERIFICATION=your_verification_code
@@ -115,7 +116,7 @@
 ### Common Issues
 
 1. **Contact Form Not Working**
-   - Check SMTP credentials
+   - Ensure SMTP credentials are configured (emails are skipped when SMTP is disabled)
    - Verify environment variables
    - Check email provider settings
    - Review server logs

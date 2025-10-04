@@ -1,16 +1,59 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type SendMailOptions, type Transporter } from 'nodemailer';
 import { env } from '@/lib/env';
 
-// Create reusable transporter
-const transporter = nodemailer.createTransporter({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_PORT === 465, // true for 465, false for other ports
-  auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS,
-  },
-});
+const smtpHost = env.SMTP_HOST;
+const smtpUser = env.SMTP_USER;
+const smtpPass = env.SMTP_PASS;
+const defaultFromAddress = env.FROM_EMAIL;
+const resolvedPort = env.SMTP_PORT ?? 587;
+
+let transporter: Transporter | null = null;
+
+if (smtpHost && smtpUser && smtpPass && defaultFromAddress) {
+  transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: resolvedPort,
+    secure: resolvedPort === 465, // true for 465, false for other ports
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+} else if (process.env.NODE_ENV !== 'test') {
+  console.info(
+    '[Email] SMTP configuration is incomplete. Email delivery is disabled.',
+    {
+      hasHost: Boolean(smtpHost),
+      hasUser: Boolean(smtpUser),
+      hasPass: Boolean(smtpPass),
+      hasFrom: Boolean(defaultFromAddress),
+    }
+  );
+}
+
+export async function sendEmail(options: SendMailOptions, context: string): Promise<void> {
+  if (!transporter) {
+    if (process.env.NODE_ENV !== 'test') {
+      const recipients = Array.isArray(options.to) ? options.to.join(', ') : options.to;
+      console.info(
+        `[Email] Skipping ${context} email because SMTP is disabled.`,
+        recipients ? { recipients } : undefined
+      );
+    }
+    return;
+  }
+
+  const finalOptions: SendMailOptions = {
+    ...options,
+    from: options.from ?? defaultFromAddress,
+  };
+
+  await transporter.sendMail(finalOptions);
+}
+
+export function isSmtpEnabled(): boolean {
+  return transporter !== null;
+}
 
 /**
  * Generate a random password
@@ -176,7 +219,7 @@ Thank you for choosing Expensio!
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  await sendEmail(mailOptions, 'welcome');
 }
 
 /**
@@ -332,7 +375,7 @@ If you need help, contact your administrator.
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  await sendEmail(mailOptions, 'temporary password');
 }
 
 /**
@@ -459,13 +502,20 @@ Contact your administrator if you need assistance.
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  await sendEmail(mailOptions, 'password reset');
 }
 
 /**
  * Verify email transporter configuration
  */
 export async function verifyEmailConfig(): Promise<boolean> {
+  if (!transporter) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.info('[Email] SMTP is disabled; skipping transporter verification.');
+    }
+    return false;
+  }
+
   try {
     await transporter.verify();
     return true;

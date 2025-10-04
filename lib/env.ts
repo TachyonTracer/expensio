@@ -10,12 +10,12 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('1h'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   
-  // Email
-  SMTP_HOST: z.string().min(1),
-  SMTP_PORT: z.coerce.number().default(587),
-  SMTP_USER: z.string().email(),
-  SMTP_PASS: z.string().min(1),
-  FROM_EMAIL: z.string().email(),
+  // Email (optional)
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().email().optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  FROM_EMAIL: z.string().email().optional(),
   
   // External APIs
   EXCHANGE_RATE_API_KEY: z.string().optional(),
@@ -33,6 +33,23 @@ const envSchema = z.object({
   
   // Security
   BCRYPT_SALT_ROUNDS: z.coerce.number().default(12),
+}).superRefine((data, ctx) => {
+  const smtpFields = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'FROM_EMAIL'] as const;
+
+  const isAnySmtpValueProvided = smtpFields.some((field) => Boolean(data[field]));
+  const isAllSmtpValuesProvided = smtpFields.every((field) => Boolean(data[field]));
+
+  if (isAnySmtpValueProvided && !isAllSmtpValuesProvided) {
+    smtpFields.forEach((field) => {
+      if (!data[field]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: 'SMTP configuration incomplete. Please provide all SMTP variables or remove them entirely.',
+        });
+      }
+    });
+  }
 });
 
 export const env = envSchema.parse(process.env);

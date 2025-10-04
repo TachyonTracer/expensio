@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
+import { AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const LoginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -15,9 +17,13 @@ type LoginFormData = z.infer<typeof LoginSchema>;
 
 interface LoginFormProps {
   onSuccess?: () => void;
+  className?: string;
+  cardClassName?: string;
+  appearance?: 'light' | 'dark';
 }
 
-export function LoginForm({ onSuccess }: LoginFormProps) {
+export function LoginForm({ onSuccess, className, cardClassName, appearance = 'light' }: LoginFormProps) {
+  const isDark = appearance === 'dark';
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
@@ -25,6 +31,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const [errors, setErrors] = useState<Partial<LoginFormData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [formMessage, setFormMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const router = useRouter();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,6 +41,10 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     // Clear error when user starts typing
     if (errors[name as keyof LoginFormData]) {
       setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
+
+    if (formMessage) {
+      setFormMessage(null);
     }
   };
 
@@ -62,6 +73,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     if (!validateForm()) return;
 
     setIsLoading(true);
+    setFormMessage(null);
     
     try {
       const response = await fetch('/api/auth/login', {
@@ -69,6 +81,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
@@ -79,17 +92,41 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         localStorage.setItem('accessToken', result.data.accessToken);
         localStorage.setItem('refreshToken', result.data.refreshToken);
         
+        setFormMessage({ type: 'success', text: 'Login successful! Redirecting...' });
         onSuccess?.();
-        router.push('/dashboard');
+        
+        // Small delay to ensure tokens are stored and UI updates
+        setTimeout(() => {
+          try {
+            // Check for redirect parameter in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectTo = urlParams.get('redirect');
+            
+            // Redirect to the intended page or default to expenses
+            if (redirectTo && redirectTo.startsWith('/')) {
+              console.log('Redirecting to:', redirectTo);
+              window.location.href = redirectTo;
+            } else {
+              // Redirect based on user role
+              const userRole = result.data.user.role;
+              const targetUrl = userRole === 'ADMIN' ? '/admin' : '/expenses';
+              console.log('Redirecting to:', targetUrl);
+              window.location.href = targetUrl;
+            }
+          } catch (error) {
+            console.error('Redirect error:', error);
+            // Fallback redirect
+            window.location.href = '/expenses';
+          }
+        }, 500);
       } else {
-        setErrors({ 
-          email: result.error?.message || 'Login failed. Please check your credentials.' 
-        });
+        const message = result.error?.message || 'Login failed. Please check your credentials.';
+        setFormMessage({ type: 'error', text: message });
+        setErrors({ email: message });
       }
-    } catch (error) {
-      setErrors({ 
-        email: 'Network error. Please try again.' 
-      });
+    } catch {
+      setFormMessage({ type: 'error', text: 'Network error. Please try again.' });
+      setErrors({ email: 'Network error. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -97,20 +134,56 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
   const handleGoogleLogin = async () => {
     // TODO: Implement Google OAuth integration
-    console.log('Google login not implemented yet');
+    setFormMessage({ type: 'error', text: 'Google login is coming soon. Please use email login for now.' });
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="bg-white rounded-lg shadow-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
-          <p className="text-gray-600 mt-2">Sign in to your Expensio account</p>
+    <div className={cn('w-full max-w-md mx-auto', className)}>
+      <div
+        className={cn(
+          'rounded-2xl p-8',
+          isDark
+            ? 'border border-white/10 bg-slate-900/70 shadow-[0_25px_70px_-35px_rgba(8,47,73,0.65)] backdrop-blur'
+            : 'bg-white shadow-xl ring-1 ring-slate-100',
+          cardClassName
+        )}
+      >
+        <div className="text-center mb-8 space-y-2">
+          <h1 className={cn('text-2xl font-bold', isDark ? 'text-white' : 'text-gray-900')}>Welcome Back</h1>
+          <p className={cn('text-sm', isDark ? 'text-slate-300' : 'text-gray-600')}>
+            Sign in to your Expensio account
+          </p>
         </div>
+
+        {formMessage && (
+          <div
+            className={cn(
+              'mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm',
+              formMessage.type === 'error'
+                ? isDark
+                  ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                  : 'border-red-200 bg-red-50 text-red-700'
+                : isDark
+                  ? 'border-blue-400/30 bg-blue-500/10 text-blue-200'
+                  : 'border-blue-200 bg-blue-50 text-blue-700'
+            )}
+            role={formMessage.type === 'error' ? 'alert' : 'status'}
+          >
+            {formMessage.type === 'error' ? (
+              <AlertCircle className={cn('h-4 w-4 flex-none mt-0.5', isDark ? 'text-red-200' : '')} />
+            ) : (
+              <ShieldCheck className={cn('h-4 w-4 flex-none mt-0.5', isDark ? 'text-blue-200' : '')} />
+            )}
+            <span className={cn(isDark ? 'text-slate-100' : '')}>{formMessage.text}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="email"
+              className={cn('block text-sm font-medium mb-2', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
               Email Address
             </label>
             <input
@@ -119,19 +192,26 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.email ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={cn(
+                'w-full rounded-lg px-4 py-2.5 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                isDark
+                  ? 'border border-white/15 bg-white/10 text-white placeholder:text-slate-400 focus:ring-blue-300 focus:border-blue-300'
+                  : 'border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:ring-blue-500 focus:border-blue-500',
+                errors.email && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+              )}
               placeholder="Enter your email"
               disabled={isLoading}
             />
             {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>{errors.email}</p>
             )}
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="password"
+              className={cn('block text-sm font-medium mb-2', isDark ? 'text-slate-200' : 'text-gray-700')}
+            >
               Password
             </label>
             <div className="relative">
@@ -141,16 +221,23 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 ${
-                  errors.password ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={cn(
+                  'w-full rounded-lg px-4 py-2.5 pr-12 text-sm shadow-sm transition focus:outline-none focus:ring-2',
+                  isDark
+                    ? 'border border-white/15 bg-white/10 text-white placeholder:text-slate-400 focus:ring-blue-300 focus:border-blue-300'
+                    : 'border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:ring-blue-500 focus:border-blue-500',
+                  errors.password && (isDark ? 'border-red-400 focus:ring-red-300' : 'border-red-500 focus:ring-red-300')
+                )}
                 placeholder="Enter your password"
                 disabled={isLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                className={cn(
+                  'absolute inset-y-0 right-0 pr-3 flex items-center transition',
+                  isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-600'
+                )}
                 disabled={isLoading}
               >
                 {showPassword ? (
@@ -166,7 +253,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               </button>
             </div>
             {errors.password && (
-              <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+              <p className={cn('mt-1 text-sm', isDark ? 'text-red-300' : 'text-red-600')}>{errors.password}</p>
             )}
           </div>
 
@@ -176,16 +263,27 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className={cn(
+                  'h-4 w-4 rounded border focus:ring-2 focus:ring-offset-1',
+                  isDark
+                    ? 'border-white/20 bg-white/5 text-blue-400 focus:ring-blue-300 focus:ring-offset-slate-900'
+                    : 'border-gray-300 text-blue-600 focus:ring-blue-500'
+                )}
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+              <label
+                htmlFor="remember-me"
+                className={cn('ml-2 block text-sm', isDark ? 'text-slate-200' : 'text-gray-700')}
+              >
                 Remember me
               </label>
             </div>
 
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-blue-600 hover:text-blue-500"
+              className={cn(
+                'text-sm font-medium',
+                isDark ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-500'
+              )}
             >
               Forgot password?
             </Link>
@@ -193,12 +291,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
           <Button
             type="submit"
-            className="w-full"
+            className={cn('w-full', isDark ? 'bg-blue-400 text-slate-950 hover:bg-blue-300' : '')}
             disabled={isLoading}
           >
             {isLoading ? (
               <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Signing in...
               </div>
             ) : (
@@ -209,18 +307,30 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
+                <div className={cn('w-full border-t', isDark ? 'border-white/10' : 'border-gray-300')} />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span
+                  className={cn(
+                    'px-2 text-sm',
+                    isDark ? 'bg-slate-900/80 text-slate-300' : 'bg-white text-gray-500'
+                  )}
+                >
+                  Or continue with
+                </span>
               </div>
             </div>
 
             <div className="mt-6">
               <Button
                 type="button"
-                variant="outline"
-                className="w-full"
+                variant={isDark ? 'ghost' : 'outline'}
+                className={cn(
+                  'w-full border rounded-lg',
+                  isDark
+                    ? 'border-white/15 bg-white/5 text-slate-100 hover:bg-white/10'
+                    : 'border-gray-300 bg-white text-gray-700'
+                )}
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
               >
@@ -246,14 +356,33 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               </Button>
             </div>
           </div>
+
+          <div
+            className={cn(
+              'mt-6 rounded-lg px-3 py-2 text-xs',
+              isDark
+                ? 'border border-blue-400/30 bg-blue-500/10 text-blue-200'
+                : 'border border-blue-100 bg-blue-50 text-blue-700'
+            )}
+          >
+            <div className="flex items-start gap-2">
+              <ShieldCheck className={cn('mt-0.5 h-4 w-4 flex-none', isDark ? 'text-blue-200' : 'text-blue-600')} />
+              <span className={cn(isDark ? 'text-blue-100' : '')}>
+                Your login is secured with enterprise-grade encryption and monitoring.
+              </span>
+            </div>
+          </div>
         </form>
 
         <div className="mt-8 text-center">
-          <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
+          <p className={cn('text-sm', isDark ? 'text-slate-300' : 'text-gray-600')}>
+            Don&apos;t have an account?{' '}
             <Link
               href="/auth/signup"
-              className="font-medium text-blue-600 hover:text-blue-500"
+              className={cn(
+                'font-medium',
+                isDark ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-500'
+              )}
             >
               Sign up
             </Link>

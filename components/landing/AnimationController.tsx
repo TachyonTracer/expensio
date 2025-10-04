@@ -11,31 +11,37 @@ import {
 
 export default function AnimationController() {
   useEffect(() => {
-    // Initialize global animations after all components are mounted
+    // Initialize global animations with better performance
     const initializeAnimations = () => {
       // Initialize performance optimizations first
       initializeOptimizations()
       
-      // Setup global animations
-      setupParallax()
-      setupButtonHovers()
-      
-      // Refresh ScrollTrigger to ensure all triggers are properly calculated
-      setTimeout(() => {
-        refreshScrollTrigger()
-      }, 100)
+      // Use requestAnimationFrame for better performance
+      requestAnimationFrame(() => {
+        setupParallax()
+        setupButtonHovers()
+        
+        // Reduced delay for ScrollTrigger refresh
+        setTimeout(() => {
+          refreshScrollTrigger()
+        }, 50)
+      })
     }
 
-    // Wait for DOM to be fully loaded
-    if (document.readyState === 'complete') {
-      initializeAnimations()
+    // Use requestIdleCallback if available for better performance
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(initializeAnimations, { timeout: 1000 })
     } else {
-      window.addEventListener('load', initializeAnimations)
+      // Fallback for browsers without requestIdleCallback
+      if (document.readyState === 'complete') {
+        initializeAnimations()
+      } else {
+        window.addEventListener('load', initializeAnimations, { once: true })
+      }
     }
 
     // Cleanup function
     return () => {
-      window.removeEventListener('load', initializeAnimations)
       cleanupScrollTriggers()
     }
   }, [])

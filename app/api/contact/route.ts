@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
 import { z } from 'zod'
+
+import { sendEmail } from '@/lib/email-utils'
 
 const contactSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -16,20 +17,9 @@ export async function POST(request: NextRequest) {
     // Validate the request body
     const validatedData = contactSchema.parse(body)
     
-    // Create transporter (you'll need to configure this with your email service)
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-
     // Email to admin
     const adminMailOptions = {
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: process.env.SMTP_FROM || process.env.FROM_EMAIL || process.env.SMTP_USER,
       to: process.env.CONTACT_EMAIL || 'admin@expensio.com',
       subject: `New Contact Form Submission from ${validatedData.name}`,
       html: `
@@ -53,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Auto-reply to user
     const userMailOptions = {
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: process.env.SMTP_FROM || process.env.FROM_EMAIL || process.env.SMTP_USER,
       to: validatedData.email,
       subject: 'Thank you for contacting Expensio',
       html: `
@@ -92,8 +82,8 @@ export async function POST(request: NextRequest) {
 
     // Send emails
     await Promise.all([
-      transporter.sendMail(adminMailOptions),
-      transporter.sendMail(userMailOptions)
+      sendEmail(adminMailOptions, 'contact notification'),
+      sendEmail(userMailOptions, 'contact auto-response')
     ])
 
     return NextResponse.json(

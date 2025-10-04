@@ -58,7 +58,8 @@ DATABASE_URL="postgresql://username:password@localhost:5432/expensio_db"
 JWT_SECRET="your-super-secret-jwt-key"
 JWT_REFRESH_SECRET="your-super-secret-refresh-key"
 
-# Email (for user invitations)
+# Email (optional - required only if you want to send transactional emails)
+# When omitted, the app will skip email delivery but continue to function.
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT=587
 SMTP_USER="your-email@gmail.com"

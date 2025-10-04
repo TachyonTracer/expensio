@@ -34,6 +34,9 @@ export const CreateCompanySchema = z.object({
   name: z.string().min(1, 'Company name is required'),
   country: z.string().min(1, 'Country is required'),
   baseCurrency: z.string().length(3, 'Currency code must be 3 characters'),
+  industry: z.string().optional(),
+  employeeCount: z.string().optional(),
+  timeZone: z.string().optional(),
 });
 export type CreateCompanyDto = z.infer<typeof CreateCompanySchema>;
 
@@ -60,6 +63,9 @@ export const CompanySchema = z.object({
   name: z.string().min(1, 'Company name is required'),
   country: z.string().min(1, 'Country is required'),
   baseCurrency: z.string().length(3, 'Currency code must be 3 characters'),
+  industry: z.string().optional().nullable(),
+  employeeCount: z.string().optional().nullable(),
+  timeZone: z.string().optional().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -216,6 +222,9 @@ export interface Company {
   name: string;
   country: string;
   baseCurrency: string;
+  industry?: string | null;
+  employeeCount?: string | null;
+  timeZone?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

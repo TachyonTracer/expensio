@@ -64,6 +64,15 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
 
+    // Set access token cookie for middleware checks
+    response.cookies.set('access_token', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60, // 15 minutes
+      path: '/',
+    });
+
     // Set refresh token as httpOnly cookie
     response.cookies.set('refreshToken', refreshToken, {
       httpOnly: true,

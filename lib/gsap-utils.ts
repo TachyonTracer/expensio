@@ -20,78 +20,55 @@ export const animationConfig = {
   }
 }
 
-// Hero animations
+// Optimized hero animations
 export const animateHero = () => {
-  const tl = gsap.timeline()
+  // Check if user prefers reduced motion
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   
-  // Animate badge
+  if (prefersReducedMotion) {
+    // Just fade in elements without complex animations
+    gsap.set(['.hero-badge', '.hero-headline', '.hero-subtext', '.hero-cta', '.hero-trust'], { opacity: 1 })
+    return
+  }
+
+  const tl = gsap.timeline({ defaults: { ease: 'power2.out' } })
+  
+  // Faster, simpler animations
   tl.fromTo('.hero-badge', 
-    { opacity: 0, y: 30, scale: 0.9 },
-    { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: 'back.out(1.7)' }
+    { opacity: 0, y: 20 },
+    { opacity: 1, y: 0, duration: 0.4 }
   )
-  
-  // Animate headline with stagger
-  tl.fromTo('.hero-headline', 
-    { opacity: 0, y: 50 },
-    { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out' },
+  .fromTo('.hero-headline', 
+    { opacity: 0, y: 30 },
+    { opacity: 1, y: 0, duration: 0.5 },
+    '-=0.2'
+  )
+  .fromTo('.hero-subtext', 
+    { opacity: 0, y: 20 },
+    { opacity: 1, y: 0, duration: 0.4 },
     '-=0.3'
   )
-  
-  // Animate subtext
-  tl.fromTo('.hero-subtext', 
-    { opacity: 0, y: 30 },
-    { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' },
-    '-=0.4'
-  )
-  
-  // Animate CTA buttons with stagger
-  tl.fromTo('.hero-cta', 
-    { opacity: 0, y: 30, scale: 0.9 },
+  .fromTo('.hero-cta', 
+    { opacity: 0, y: 20 },
     { 
       opacity: 1, 
       y: 0, 
-      scale: 1, 
-      duration: 0.6, 
-      ease: 'back.out(1.7)',
-      stagger: 0.1
+      duration: 0.4,
+      stagger: 0.05
     },
-    '-=0.3'
-  )
-  
-  // Animate trust indicators
-  tl.fromTo('.hero-trust', 
-    { opacity: 0, y: 20 },
-    { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' },
     '-=0.2'
   )
+  .fromTo('.hero-trust', 
+    { opacity: 0 },
+    { opacity: 1, duration: 0.3 },
+    '-=0.1'
+  )
   
-  // Animate floating elements with continuous motion
-  gsap.to('.hero-float-1', {
-    y: -20,
-    duration: 3,
-    ease: 'power1.inOut',
-    yoyo: true,
-    repeat: -1
-  })
-  
-  gsap.to('.hero-float-2', {
-    y: -15,
-    x: 10,
-    duration: 4,
-    ease: 'power1.inOut',
-    yoyo: true,
-    repeat: -1,
-    delay: 1
-  })
-  
-  gsap.to('.hero-float-3', {
-    y: -25,
-    x: -5,
-    duration: 3.5,
-    ease: 'power1.inOut',
-    yoyo: true,
-    repeat: -1,
-    delay: 2
+  // Add CSS-based floating animations
+  const floatingElements = document.querySelectorAll('[class*="hero-float"]')
+  floatingElements.forEach((element, index) => {
+    element.classList.add('floating-animation')
+    element.style.animationDelay = `${index * 0.5}s`
   })
 }
 
@@ -207,20 +184,24 @@ export const animateStats = () => {
   })
 }
 
-// Parallax effect for background elements
+// Optimized parallax effect for background elements
 export const setupParallax = () => {
-  gsap.utils.toArray('.parallax-element').forEach((element: any) => {
-    gsap.to(element, {
-      yPercent: -50,
-      ease: 'none',
-      scrollTrigger: {
-        trigger: element,
-        start: 'top bottom',
-        end: 'bottom top',
-        scrub: true
-      }
+  // Only enable parallax on desktop for better performance
+  if (window.innerWidth > 1024) {
+    gsap.utils.toArray('.parallax-element').forEach((element: any) => {
+      gsap.to(element, {
+        yPercent: -30, // Reduced movement for better performance
+        ease: 'none',
+        scrollTrigger: {
+          trigger: element,
+          start: 'top bottom',
+          end: 'bottom top',
+          scrub: 1, // Add slight delay for smoother animation
+          invalidateOnRefresh: true
+        }
+      })
     })
-  })
+  }
 }
 
 // Form animation
@@ -243,18 +224,13 @@ export const animateForm = () => {
   )
 }
 
-// Button hover animations
+// Optimized button hover animations using CSS
 export const setupButtonHovers = () => {
   const buttons = document.querySelectorAll('.animated-button')
   
   buttons.forEach(button => {
-    button.addEventListener('mouseenter', () => {
-      gsap.to(button, { scale: 1.05, duration: 0.3, ease: 'power2.out' })
-    })
-    
-    button.addEventListener('mouseleave', () => {
-      gsap.to(button, { scale: 1, duration: 0.3, ease: 'power2.out' })
-    })
+    // Add CSS class for hover effects instead of GSAP
+    button.classList.add('optimized-hover')
   })
 }
 
@@ -276,18 +252,35 @@ export const animateDarkModeTransition = () => {
   })
 }
 
-// Performance optimization for mobile devices
+// Enhanced performance optimization for mobile devices
 export const optimizeForMobile = () => {
   const isMobile = window.innerWidth < 768
+  const isTablet = window.innerWidth < 1024
   
   if (isMobile) {
-    // Reduce animation complexity on mobile
-    gsap.globalTimeline.timeScale(1.5) // Speed up animations
+    // Significantly reduce animation complexity on mobile
+    gsap.globalTimeline.timeScale(2) // Speed up animations more
     
-    // Disable some heavy animations on mobile
-    const heavyAnimations = document.querySelectorAll('.parallax-element')
+    // Disable heavy animations on mobile
+    const heavyAnimations = document.querySelectorAll('.parallax-element, .hero-float-1, .hero-float-2, .hero-float-3')
     heavyAnimations.forEach(el => {
-      el.classList.add('mobile-optimized')
+      el.style.display = 'none' // Hide floating elements on mobile
+    })
+    
+    // Disable ScrollTrigger scrub animations on mobile
+    ScrollTrigger.getAll().forEach(trigger => {
+      if (trigger.vars.scrub) {
+        trigger.kill()
+      }
+    })
+  } else if (isTablet) {
+    // Moderate optimization for tablets
+    gsap.globalTimeline.timeScale(1.3)
+    
+    // Reduce floating elements on tablet
+    const floatingElements = document.querySelectorAll('.hero-float-2, .hero-float-3')
+    floatingElements.forEach(el => {
+      el.style.opacity = '0.1'
     })
   }
 }
@@ -359,9 +352,19 @@ export const initializeOptimizations = () => {
   optimizeForMobile()
   preloadAnimations()
   
-  // Listen for resize events
-  window.addEventListener('resize', adjustForScreenSize)
+  // Throttled resize listener for better performance
+  let resizeTimeout: NodeJS.Timeout
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout)
+    resizeTimeout = setTimeout(adjustForScreenSize, 150)
+  })
   
   // Setup intersection observer for performance
   setupIntersectionObserver()
+  
+  // Configure ScrollTrigger for better performance
+  ScrollTrigger.config({
+    autoRefreshEvents: 'visibilitychange,DOMContentLoaded,load',
+    ignoreMobileResize: true
+  })
 }

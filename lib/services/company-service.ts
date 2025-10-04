@@ -17,6 +17,9 @@ export interface CompanySetupResult {
     name: string;
     country: string;
     baseCurrency: string;
+    industry: string | null;
+    employeeCount: string | null;
+    timeZone: string | null;
   };
   adminUser: {
     id: string;
@@ -79,6 +82,9 @@ export async function createCompanyWithAdmin(
         name: setupData.company.name,
         country: setupData.company.country,
         baseCurrency: detectedCurrency,
+        industry: setupData.company.industry ?? null,
+        employeeCount: setupData.company.employeeCount ?? null,
+        timeZone: setupData.company.timeZone ?? null,
       },
     });
 
@@ -117,6 +123,9 @@ export async function createCompanyWithAdmin(
       name: result.company.name,
       country: result.company.country,
       baseCurrency: result.company.baseCurrency,
+      industry: result.company.industry,
+      employeeCount: result.company.employeeCount,
+      timeZone: result.company.timeZone,
     },
     adminUser: {
       id: result.adminUser.id,
@@ -207,6 +216,9 @@ export async function updateCompanySettings(
   name: string;
   country: string;
   baseCurrency: string;
+  industry: string | null;
+  employeeCount: string | null;
+  timeZone: string | null;
   updatedAt: Date;
 }> {
   // Check if another company with the same name exists (if name is being updated)
@@ -223,9 +235,27 @@ export async function updateCompanySettings(
     }
   }
 
+  const data: Record<string, any> = { ...updates };
+
+  if (updates.baseCurrency) {
+    data.baseCurrency = updates.baseCurrency.toUpperCase();
+  }
+
+  if ('industry' in updates) {
+    data.industry = updates.industry ?? null;
+  }
+
+  if ('employeeCount' in updates) {
+    data.employeeCount = updates.employeeCount ?? null;
+  }
+
+  if ('timeZone' in updates) {
+    data.timeZone = updates.timeZone ?? null;
+  }
+
   const updatedCompany = await prisma.company.update({
     where: { id: companyId },
-    data: updates,
+    data,
   });
 
   return {
@@ -233,6 +263,9 @@ export async function updateCompanySettings(
     name: updatedCompany.name,
     country: updatedCompany.country,
     baseCurrency: updatedCompany.baseCurrency,
+    industry: updatedCompany.industry,
+    employeeCount: updatedCompany.employeeCount,
+    timeZone: updatedCompany.timeZone,
     updatedAt: updatedCompany.updatedAt,
   };
 }
@@ -300,6 +333,9 @@ export async function getCompanyOverview(companyId: string) {
       name: company.name,
       country: company.country,
       baseCurrency: company.baseCurrency,
+      industry: company.industry,
+      employeeCount: company.employeeCount,
+      timeZone: company.timeZone,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
     },
