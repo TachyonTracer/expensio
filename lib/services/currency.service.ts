@@ -249,7 +249,10 @@ export class CurrencyService {
               exchangeRate: currency.exchangeRate,
               lastUpdated: currency.lastUpdated,
             },
-            create: currency,
+            create: {
+              ...currency,
+              exchangeRate: currency.exchangeRate,
+            },
           })
         )
       );
@@ -274,7 +277,12 @@ export class CurrencyService {
         where: { code: code.toUpperCase() },
       });
 
-      return currency;
+      if (!currency) return null;
+
+      return {
+        ...currency,
+        exchangeRate: currency.exchangeRate.toNumber(),
+      };
     } catch (error) {
       console.error('Error getting currency from database:', error);
       throw new Error(
@@ -292,7 +300,10 @@ export class CurrencyService {
         orderBy: { code: 'asc' },
       });
 
-      return currencies;
+      return currencies.map(currency => ({
+        ...currency,
+        exchangeRate: currency.exchangeRate.toNumber(),
+      }));
     } catch (error) {
       console.error('Error getting currencies from database:', error);
       throw new Error(

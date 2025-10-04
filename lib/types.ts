@@ -447,7 +447,14 @@ export interface ManagerDashboardData {
   pendingApprovals: number;
   teamExpenses: number;
   monthlyTeamSpend: number;
-  pendingExpensesList: Expense[];
+  pendingExpensesList: Array<Expense & {
+    user?: User;
+    currentApproval?: {
+      id: string;
+      status: string;
+      createdAt: Date;
+    };
+  }>;
   teamMembers: User[];
 }
 
