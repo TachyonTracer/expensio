@@ -1,18 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
-  },
+  serverExternalPackages: ['@prisma/client', 'bcryptjs'],
   images: {
     domains: ['localhost'],
     formats: ['image/webp', 'image/avif'],
-  },
-  // Enable API routes body parsing
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
   },
   // Security headers
   async headers() {
