@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { BreadcrumbProvider } from "@/lib/hooks/use-breadcrumb";
+import { AnimationProvider } from "@/lib/hooks/use-animation-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +34,11 @@ export default function RootLayout({
           defaultTheme="system"
           storageKey="expensio-theme"
         >
-          {children}
+          <AnimationProvider>
+            <BreadcrumbProvider>
+              {children}
+            </BreadcrumbProvider>
+          </AnimationProvider>
         </ThemeProvider>
       </body>
     </html>
